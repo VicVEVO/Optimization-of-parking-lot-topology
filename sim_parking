@@ -140,48 +140,40 @@ def place_vue(voiture,parking,intersec_dispo):
         if intersec_dispo == ['gauche']:
             for y in range(0,y_av):
                 if parking[y,x_places1] == 2 or parking[y,x_places2] == 2: # s'il y a une place à gauche
-                    print("places vues parmi",(x_places1,y),(x_places2,y))
                     return ['gauche']
         else:
             for y in range(y_av+1,largeur_parking+2):
                 if parking[y,x_places1] == 2 or parking[y,x_places2] == 2: # s'il y a une place à droite
-                    print("places vues parmi",(x_places1,y),(x_places2,y))
                     return ['droite']
 
     elif direction == -1:
         if intersec_dispo == ['gauche']:
             for y in range(y_av+1,largeur_parking):
                 if parking[y,x_places1] == 2 or parking[y,x_places2] == 2: # s'il y a une place à gauche
-                    print("places vues parmi",(x_places1,y),(x_places2,y))
                     return ['gauche']
         else:
             for y in range(0,y_av):
                 if parking[y,x_places1] == 2 or parking[y,x_places2] == 2: # s'il y a une place à droite
-                    print("places vues parmi",(x_places1,y),(x_places2,y))
                     return ['droite']
 
     elif direction == -2:
         if intersec_dispo == ['gauche']:
             for x in range(0,x_av):
                 if parking[y_places1,x] == 2 or parking[y_places2,x] == 2: # s'il y a une place à gauche
-                    print("places vues parmi",(x,y_places1),(x,y_places2))
                     return ['gauche']
         else:
             for x in range(x_av+1,largeur_parking):
                 if parking[y_places1,x] == 2 or parking[y_places2,x] == 2: # s'il y a une place à droite
-                    print("places vues parmi",(x,y_places1),(x,y_places2))
                     return ['droite']
     
     else:
         if intersec_dispo == ['gauche']:
             for x in range(x_av+1,largeur_parking):
                 if parking[y_places1,x] == 2 or parking[y_places2,x] == 2: # s'il y a une place à gauche
-                    print("places vues parmi",(x,y_places1),(x,y_places2))
                     return ['gauche']
         else:
             for x in range(0,x_av):
                 if parking[y_places1,x] == 2 or parking[y_places2,x] == 2: # s'il y a une place à droite
-                    print("places vues parmi",(x,y_places1),(x,y_places2))
                     return ['droite']
     return []
 
@@ -300,16 +292,14 @@ def simulation(voitures,parking,tab,N_iterations): # procédure qui fait évolue
             voitures.append([[0,largeur_parking//2+1],[0,largeur_parking//2+1],1,False,False]) 
         
         if len(voitures) != 0: # s'il y a des voitures sur le parking
-            for num_voiture in range(len(voitures)): # on ne peut pas faire de for num_voiture in range(len(voitures)) car voitures peut diminuer entre 2 itérations 
-                print('-----------------',num_voiture,'-----------------')
+            for num_voiture in range(len(voitures)): 
                 voiture = voitures[num_voiture]
-                if voiture != []: # si la voiture n'est pas sortie du parking
-                    #num_voiture = get_index(voiture,voitures)
-                    
+                if voiture != []: # si la voiture n'est ni sortie du parking ni garée
+                                        
                     try:
                         inters = intersection(voiture,parking)
                         
-                        if len(inters) == 0 and voiture[3] == True: # si la voiture est en train de se garer
+                        if voiture[3] == True: # si la voiture est en train de se garer
                             voiture = avance(voiture,parking)
                             parking[voiture[0][1],voiture[0][0]] = 3 # la place est désormais prise
                             
@@ -317,21 +307,16 @@ def simulation(voitures,parking,tab,N_iterations): # procédure qui fait évolue
 
                         elif len(inters) != 0: # si la voiture peut tourner
                             place_imminente = peut_se_garer(voiture,parking)
-                            print('place imminente',place_imminente)
                             
                             if place_imminente != []: # s'il y a une place juste à côté de la voiture
 
                                 if place_imminente == ["devant"]:
                                     voiture = avance(voiture,parking)
 
-                                    print("coords_voit:",voiture[0][1],voiture[0][0])
                                     voiture[4] = True # la voiture est désormais garée
-
 
                                 else:
                                     voiture = braque(voiture,place_imminente)
-                                    print("elle tourne pour se garer")
-                                    print("Apres avoir tourné:",voiture[0][1],voiture[0][0])
                                     voiture[3] = True # elle est en train de se garer
                                     if parking[voiture[0][1],voiture[0][0]] == 2:
                                         voiture[4] = True # la voiture est directement garée
@@ -339,24 +324,18 @@ def simulation(voitures,parking,tab,N_iterations): # procédure qui fait évolue
                             elif not voiture[4] and not voiture[3]: # si la voiture n'est pas dans la procédure de garage et n'est pas non plus garée
                                 if inters == ["devant"]: # si la voiture ne peut qu'avancer
                                     voiture = avance(voiture,parking)
-                                    print('elle avance')
                                 else: # si elle peut tourner à droite ou à gauche
                                     
                                     place_dispo = place_vue(voiture,parking,inters) # on regarde s'il y a de la place disponible
 
-                                    print('elle voit une place à ', place_dispo, 'et elle peut tourner à ', inters)
-
                                     if place_dispo != []:
                                         voiture = braque(voiture,place_dispo)
-                                        print('et elle tourne')
                                     else:
                                         if voie_libre(voiture,parking):
                                             voiture = avance(voiture,parking)
-                                            print('pas de place donc tourne qd meme car ne peut pas avancer')
                                         else:
                                             voiture = braque(voiture,inters)
-                                            print('pas de place donc continue')
-                        print(voiture)
+
 
                         if voiture[4]:
                             voitures[num_voiture] = []
@@ -368,7 +347,6 @@ def simulation(voitures,parking,tab,N_iterations): # procédure qui fait évolue
                     except IndexError: # si oob
                         voitures[num_voiture] = []# la voiture disparaît car elle est sortie du parking
                         maj(voiture,parking,voiture[4],True)
-                        # la voiture suivante n'est pas étudiée
                 else:
                     pass
 
