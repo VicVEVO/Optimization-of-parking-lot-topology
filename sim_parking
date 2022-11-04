@@ -295,7 +295,7 @@ def simulation(voitures,parking,tab,N_iterations): # procédure qui fait évolue
             for num_voiture in range(len(voitures)): 
                 voiture = voitures[num_voiture]
                 if voiture != []: # si la voiture n'est ni sortie du parking ni garée
-                                        
+                    
                     try:
                         inters = intersection(voiture,parking)
                         
@@ -335,7 +335,6 @@ def simulation(voitures,parking,tab,N_iterations): # procédure qui fait évolue
                                             voiture = avance(voiture,parking)
                                         else:
                                             voiture = braque(voiture,inters)
-
 
                         if voiture[4]:
                             voitures[num_voiture] = []
