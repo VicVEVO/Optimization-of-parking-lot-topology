@@ -6,11 +6,15 @@ Il y a la procédure de garage
 12/10: implémentation de la recherche de places lorsque la voiture avance, et tourne en respectant sens circulation si elle voit une place 
 19/10: implémentation de la procédure de garage totale terminée
 26/10: en fait gros pbs qd y'a bcp de voitures: 5 problèmes répertoriés
+08/11: fixage de pbs et ajout variable -nb_places_dispo- tq quand plus de places les voiturent non garées sortent
+
 
 À changer: fix cas où on tourne deux fois d'affilée: on tourne 2 fois d'affilée ssi on ne peut pas aller ensuite tout droit (cas normalement jamais réalisé)
 
 PROBLEMES RENCONTRÉS:
 Dans quel sens balayer/étudier voitures ?
+    >> d'abord celles qui se garent
+    >> puis..?
 
 
 
@@ -25,23 +29,27 @@ import random as rd
 from matplotlib import pyplot as plt
 import matplotlib.animation as animation
 
+def ouverture_parking(nom): # prend comme parking vide un parking déjà créé dans le passé
+    return np.loadtxt('{}.txt'.format(nom)).astype('int')
+
 def init_parking(longueur,largeur): # crée un parking vide avec une infrastructure donnée
     
     bords = -np.ones(longueur,dtype=int)
 
     parking = -np.ones((largeur,longueur),dtype=int)
     
-    
     for x in range(3,longueur-1):
         if x%4 == 1 or x%4 == 2:
             for y in range(2,largeur-2):
+
                 if rd.random() < 0.3:
                     parking[y,x] = 2 # emplacements libres
                 else:
                     parking[y,x] = 3 # emplacement pris
+                
         else:
             parking[:,x] = 0 # files vides
-    
+
 
     parking[largeur//2],parking[largeur//2-1] = 0,0 # création de la route principale 
     parking[0,3:-1],parking[1,3:-1],parking[-1,3:-1],parking[-2,3:-1] = 0,0,0,0 # création des routes des fins de files
@@ -61,20 +69,115 @@ def affichage(tab): # affichage final
     
     # Animation
     N_t = tab.shape[0]
-    ani = animation.FuncAnimation(fig, update_ani, frames = N_t, interval = 20, fargs=(tab, image), repeat = True)
+    ani = animation.FuncAnimation(fig, update_ani, frames = N_t, interval = 1, fargs=(tab, image), repeat = True)
 
     ax = plt.gca()
     ax.get_xaxis().set_visible(False)
     ax.get_yaxis().set_visible(False)
-    plt.set_cmap('bone') #gist_gray
+    plt.set_cmap('BrBG') #gist_gray ou bone
 
     plt.show()
 
-def get_index(objet,liste):
+def get_index(objet,liste): # cette fonction ne sert à rien
     for i in range(len(liste)):
         if liste[i] == objet:
             return i
     return None
+
+def ordonne(voitures): # trie l'ordre d'étude des voitures: on étudie d'abord celles qui se garent pour éviter les embouteillages
+    voitures_se_garant = []
+    autres_voitures = []
+    for voiture in voitures:
+        if voiture != [] and not voiture[4]: # si la voiture n'est pas garée, on ne prend plus en compte celles garées
+            if voiture[3]: # si elle se gare
+                voitures_se_garant.append(voiture)
+            else:
+                autres_voitures.append(voiture)
+
+    return voitures_se_garant + autres_voitures
+
+def prioritaire(voiture):
+    return (voiture[0][1] == 13 or voiture[0][1] == 14)
+
+def corrigee(coord): # pour éviter les oob
+    [x,y] = [coord[0],coord[1]]
+    if x<0:
+        x=0
+    elif x>=longueur_parking:
+        x = longueur_parking-1
+    if y<0:
+        y = 0
+    elif y>= largeur_parking+2:
+        y = largeur_parking+1
+    return [x,y]
+
+def coordonnée_pour(voiture,endroit): # fonction en cours de création pour éviter les trucs moches dans def intersection, def tourne..
+    direction = voiture[2]
+    x,y = voiture[0][0],voiture[0][1]
+
+    coord = []
+
+    if endroit == 'devant' or endroit == 'devant_devant': # renvoie les coordonnées du point devant la voiture 
+        if direction%2 == 1:
+            if endroit == 'devant':
+                coord = [x+direction , y]
+            else:
+                coord = [x+2*direction , y]
+        else:
+            if endroit == 'devant':
+                coord = [x , y+direction//2]
+            else:
+                coord = [x , y+direction]
+
+    elif endroit == 'gauche_devant' or endroit == 'droite_devant': # renvoie les coordonnées à la gauche et à droite de la voiture (cf. fichier paint)
+        if direction%2 == 1:
+            if endroit == 'gauche_devant':
+                coord = [x+direction , y-direction]
+            else:
+                coord = [x+direction , y+direction]
+        else:
+            if endroit == 'gauche_devant':
+                coord = [x+direction//2 , y+direction//2]
+            else:
+                coord = [x-direction//2 , y+direction//2]
+    
+    elif endroit == 'place_gauche' or endroit == 'place_droite':
+        if direction%2 == 1:
+            if endroit == 'place_gauche':
+                coord = [x , y-2*direction]
+            else:
+                coord = [x , y + direction]
+        else:
+            if endroit == 'place_gauche':
+                coord = [x+direction , y]
+            else:
+                coord = [x-direction//2 , y]
+
+    elif endroit == 'gauche_non_contresens' or endroit == 'droite_non_contresens': # juste
+        if direction%2 == 1:
+            if endroit == 'gauche_non_contresens':
+                coord = [x+direction , y-2*direction]
+            else:
+                coord = [x-direction , y+direction]
+        else:
+            if endroit == 'gauche_non_contresens':
+                coord = [x+direction , y+direction//2]
+            else:
+                coord = [x-direction//2 , y-direction//2]
+
+    elif endroit == 'droite_devant_2_cases' or endroit == 'droite_droite_devant_2_cases': # cf. fichier paint
+        if direction%2 == 1:
+            if endroit == 'droite_devant_2_cases':
+                coord = [x+2*direction , y+direction]
+            else:
+                coord = [x+2*direction , y+2*direction]
+        else:
+            if endroit == 'droite_devant_2_cases':
+                coord = [x-direction//2 , y+direction]
+            else:
+                coord = [x-direction , y+direction]
+                
+    return corrigee(coord)
 
 def avance(voiture,parking): # voiture = [[x_av,y_av],[ex_x_av,ex_y_av],alpha]
     x_av, y_av = voiture[0][0], voiture[0][1]
@@ -91,7 +194,7 @@ def avance(voiture,parking): # voiture = [[x_av,y_av],[ex_x_av,ex_y_av],alpha]
     else:
         y_av += int(direction/2)
 
-    return [[x_av,y_av],[ex_x_av,ex_y_av], direction, voiture[3], voiture[4]]
+    return [[x_av,y_av],[ex_x_av,ex_y_av], direction, voiture[3], voiture[4], voiture[5]]
 
 def maj(voiture,parking,garee=False,remove=False): # procédure mettant à jour le parking en y affichant les nouvelles coordonnées des véhicules
     x_av, y_av = int(voiture[0][0]), int(voiture[0][1])
@@ -125,78 +228,87 @@ def place_vue(voiture,parking,intersec_dispo):
         if intersec_dispo == ['gauche']: # si la voiture peut aller à gauche
             x_places1, y_places1 = x_av + direction , y_av # abscisse des places de parking devant elle
             x_places2, y_places2 = x_av - 2*direction , y_av # abcisse des places de parking derrière elle
-        else: # si la voiture peut aller à droite
+        elif intersec_dispo == ['droite']: # si la voiture peut aller à droite
             x_places1, y_places1 = x_av - direction , y_av
             x_places2, y_places2 = x_av + 2*direction , y_av
     else: # si la voiture va de haut en bas ou inversement
         if intersec_dispo == ['gauche']:
             x_places1, y_places1 = x_av , y_av + direction//2
             x_places2, y_places2 = x_av , y_av - direction
-        else:
+        elif intersec_dispo == ['droite']:
             x_places1, y_places1 = x_av , y_av - direction//2
             x_places2, y_places2 = x_av , y_av + direction
 
     if direction == 1:
         if intersec_dispo == ['gauche']:
             for y in range(0,y_av):
-                if parking[y,x_places1] == 2 or parking[y,x_places2] == 2: # s'il y a une place à gauche
-                    print("places vues parmi",(x_places1,y),(x_places2,y))
-                    return ['gauche']
-        else:
+                try:
+                    if parking[y,x_places1] == 2 or parking[y,x_places2] == 2: # s'il y a une place à gauche
+                        return ['gauche']
+                except IndexError:
+                    pass
+        elif intersec_dispo == ['droite']:
             for y in range(y_av+1,largeur_parking+2):
-                if parking[y,x_places1] == 2 or parking[y,x_places2] == 2: # s'il y a une place à droite
-                    print("places vues parmi",(x_places1,y),(x_places2,y))
-                    return ['droite']
+                try:
+                    if parking[y,x_places1] == 2 or parking[y,x_places2] == 2: # s'il y a une place à droite
+                        return ['droite']
+                except IndexError:
+                    pass
 
     elif direction == -1:
         if intersec_dispo == ['gauche']:
             for y in range(y_av+1,largeur_parking):
-                if parking[y,x_places1] == 2 or parking[y,x_places2] == 2: # s'il y a une place à gauche
-                    print("places vues parmi",(x_places1,y),(x_places2,y))
-                    return ['gauche']
-        else:
+                try:
+                    if parking[y,x_places1] == 2 or parking[y,x_places2] == 2: # s'il y a une place à gauche
+                        return ['gauche']
+                except IndexError:
+                    pass
+        elif intersec_dispo == ['droite']:
             for y in range(0,y_av):
-                if parking[y,x_places1] == 2 or parking[y,x_places2] == 2: # s'il y a une place à droite
-                    print("places vues parmi",(x_places1,y),(x_places2,y))
-                    return ['droite']
+                try:
+                    if parking[y,x_places1] == 2 or parking[y,x_places2] == 2: # s'il y a une place à droite
+                        return ['droite']
+                except IndexError:
+                    pass
 
     elif direction == -2:
         if intersec_dispo == ['gauche']:
             for x in range(0,x_av):
-                if parking[y_places1,x] == 2 or parking[y_places2,x] == 2: # s'il y a une place à gauche
-                    print("places vues parmi",(x,y_places1),(x,y_places2))
-                    return ['gauche']
-        else:
+                try:
+                    if parking[y_places1,x] == 2 or parking[y_places2,x] == 2: # s'il y a une place à gauche
+                        return ['gauche']
+                except IndexError:
+                    pass
+        elif intersec_dispo == ['droite']:
             for x in range(x_av+1,largeur_parking):
-                if parking[y_places1,x] == 2 or parking[y_places2,x] == 2: # s'il y a une place à droite
-                    print("places vues parmi",(x,y_places1),(x,y_places2))
-                    return ['droite']
+                try:
+                    if parking[y_places1,x] == 2 or parking[y_places2,x] == 2: # s'il y a une place à droite
+                        return ['droite']
+                except IndexError:
+                    pass
     
     else:
         if intersec_dispo == ['gauche']:
             for x in range(x_av+1,largeur_parking):
-                if parking[y_places1,x] == 2 or parking[y_places2,x] == 2: # s'il y a une place à gauche
-                    print("places vues parmi",(x,y_places1),(x,y_places2))
-                    return ['gauche']
-        else:
+                try:
+                    if parking[y_places1,x] == 2 or parking[y_places2,x] == 2: # s'il y a une place à gauche
+                        return ['gauche']
+                except IndexError:
+                    pass
+        elif intersec_dispo == ['droite']:
             for x in range(0,x_av):
-                if parking[y_places1,x] == 2 or parking[y_places2,x] == 2: # s'il y a une place à droite
-                    print("places vues parmi",(x,y_places1),(x,y_places2))
-                    return ['droite']
+                try:
+                    if parking[y_places1,x] == 2 or parking[y_places2,x] == 2: # s'il y a une place à droite
+                        return ['droite']
+                except IndexError:
+                    pass
     return []
 
 def peut_se_garer(voiture,parking): # renvoie une liste avec la place imminente dispo pour s'y garer
-    direction = voiture[2]
 
-    x_avant_voit,y_avant_voit = voiture[0][0],voiture[0][1]
-    if direction%2 == 1: #si la voiture va de gauche à droite ou l'inverse
-        coord_pot_place_gauche = [x_avant_voit  ,  y_avant_voit-2*direction] # coord potentielle place à gauche de la voiture
-        coord_pot_place_droite = [x_avant_voit  ,  y_avant_voit+direction]
-        coord_pot_devant = [x_avant_voit + direction  ,  y_avant_voit]
-    else:
-        coord_pot_place_gauche = [x_avant_voit+direction  ,  y_avant_voit]
-        coord_pot_place_droite = [x_avant_voit-direction//2  ,  y_avant_voit]
-        coord_pot_devant = [x_avant_voit  ,  y_avant_voit + direction//2]
+    coord_pot_devant = coordonnée_pour(voiture,'devant')
+    coord_pot_place_gauche = coordonnée_pour(voiture,'place_gauche')
+    coord_pot_place_droite = coordonnée_pour(voiture,'place_droite')
 
     if voiture[2]%2 !=1 : # la voiture ne peut pas se garer en mode bourrin transversalement
         if parking[coord_pot_place_droite[1],coord_pot_place_droite[0]] == 2: # s'il y a une place libre à droite
@@ -208,52 +320,40 @@ def peut_se_garer(voiture,parking): # renvoie une liste avec la place imminente 
     return []
 
 def tourne(voiture,parking,angle): # fait tourner puis avancer selon valeur alpha
-
     voiture[2] = angle
     voiture = avance(voiture,parking)
 
     return voiture
 
 def intersection(voiture,parking): # renvoie si voiture peut tourner à gauche, à droite, rester tout droit ou doit s'arrêter
-    direction = voiture[2]
+    coord_gauche_toute = coordonnée_pour(voiture,"gauche_non_contresens")
+    coord_droite_toute = coordonnée_pour(voiture,"droite_devant")
+    coord_gauche_devant = coordonnée_pour(voiture,"place_gauche")
+    coord_droite_devant = coordonnée_pour(voiture,"place_droite")
 
-    x_avant_voit,y_avant_voit = voiture[0][0],voiture[0][1]
-    if direction%2 == 1: #si la voiture va de gauche à droite ou l'inverse
-        coord_gauche = [x_avant_voit+direction  ,  y_avant_voit-2*direction] # cf fichier paint expliquant ceci
-        coord_droite = [x_avant_voit+direction  ,  y_avant_voit+direction]
-        coord_gauche_file_opposee = [x_avant_voit  ,  y_avant_voit-2*direction] # ces 2 coordonnées permettent de se mettre dans le cas spécial expliqué
-        coord_droite_file_opposee = [x_avant_voit  ,  y_avant_voit+direction]
+    coord_droite_non_contresens = coordonnée_pour(voiture,"droite_non_contresens")
+    coord_gauche_non_contresens = coordonnée_pour(voiture,"gauche_non_contresens")
 
-        coord_droite_non_contresens = [x_avant_voit - direction , y_avant_voit + direction] # permet de ne pas rouler en contresens en tournant à droite juste après avoir tourné
-        coord_gauche_non_contresens = [x_avant_voit + direction , y_avant_voit - 2*direction]
-        
-    else:
-        coord_gauche = [x_avant_voit+direction//2  ,  y_avant_voit+direction//2]
-        coord_droite = [x_avant_voit-direction//2  ,  y_avant_voit+direction//2]
-        coord_gauche_file_opposee = [x_avant_voit+direction  ,  y_avant_voit]
-        coord_droite_file_opposee = [x_avant_voit-direction//2  ,  y_avant_voit]
-
-        coord_droite_non_contresens = [x_avant_voit - direction//2 , y_avant_voit - direction//2]
-        coord_gauche_non_contresens = [x_avant_voit + direction , y_avant_voit + direction//2]
-        
-    
-    if parking_ref[coord_gauche_file_opposee[1],coord_gauche_file_opposee[0]] == 0:# s'il y a une intersection avec une route à gauche de la voiture
-        if parking_ref[coord_gauche[1],coord_gauche[0]] == 0 and parking_ref[coord_droite_file_opposee[1],coord_droite_file_opposee[0]] == 0 and parking_ref[coord_droite_non_contresens[1],coord_droite_non_contresens[0]] != 0: # s'il y a une intersection avec une route à droite directement
+    if parking_ref[coord_gauche_devant[1],coord_gauche_devant[0]] == 0:# s'il y a une intersection avec une route à gauche de la voiture
+        if parking_ref[coord_gauche_toute[1],coord_gauche_toute[0]] == 0 and parking_ref[coord_droite_devant[1],coord_droite_devant[0]] == 0 and parking_ref[coord_droite_non_contresens[1],coord_droite_non_contresens[0]] != 0: # s'il y a une intersection avec une route à droite directement
             return ["droite"]
-        elif parking_ref[coord_gauche[1],coord_gauche[0]] != 0 and parking_ref[coord_gauche_non_contresens[1],coord_gauche_non_contresens[0]] != 0:
+        elif parking_ref[coord_gauche_toute[1],coord_gauche_toute[0]] != 0 and parking_ref[coord_gauche_non_contresens[1],coord_gauche_non_contresens[0]] != 0:
             return ["gauche"]
     
-    if parking_ref[coord_droite_file_opposee[1],coord_droite_file_opposee[0]] == 0:# s'il y a une intersection avec une route à droite de la voiture
-        if parking_ref[coord_droite[1],coord_droite[0]] == 0 and parking_ref[coord_droite_non_contresens[1],coord_droite_non_contresens[0]] != 0:
+    if parking_ref[coord_droite_devant[1],coord_droite_devant[0]] == 0:# s'il y a une intersection avec une route à droite de la voiture
+        if parking_ref[coord_droite_toute[1],coord_droite_toute[0]] == 0 and parking_ref[coord_droite_non_contresens[1],coord_droite_non_contresens[0]] != 0:
             return ["droite"]
-        elif parking_ref[coord_gauche[1],coord_gauche[0]] == 0 and parking_ref[coord_gauche_non_contresens[1],coord_gauche_non_contresens[0]] != 0:
+        elif parking_ref[coord_gauche_toute[1],coord_gauche_toute[0]] == 0 and parking_ref[coord_gauche_non_contresens[1],coord_gauche_non_contresens[0]] != 0:
             return ['gauche']
     
-    if direction%2 == 1: #si la voiture va de gauche à droite ou l'inverse
-        x_av_juste_devant,y_av_juste_devant = x_avant_voit+direction  ,  y_avant_voit # cf fichier paint expliquant ceci
-    else:
-        x_av_juste_devant,y_av_juste_devant = x_avant_voit+direction//2  ,  y_avant_voit
-    if parking[y_av_juste_devant,x_av_juste_devant] in [0,3]:
+    [x_devant , y_devant] = corrigee(coordonnée_pour(voiture,'devant'))
+    '''
+    if y_devant >= largeur_parking+2 or y_devant < 0: # pour éviter le oob
+        y_devant = voiture[0][1]
+    if x_devant >= longueur_parking or x_devant <0 :
+        x_devant = voiture[0][0]
+    '''
+    if parking[y_devant,x_devant] in [0,2]:
         return ["devant"]
     return []
 
@@ -291,85 +391,144 @@ def braque(voiture,intersections_dispo): # intersections_dispo est une liste (=i
             angle = 1
         return tourne(voiture,parking,angle)
 
-def simulation(voitures,parking,tab,N_iterations): # procédure qui fait évoluer le parking avec ses voitures
+def simulation(voitures,parking,nb_places_libres,tab,N_iterations): # procédure qui fait évoluer le parking avec ses voitures
     
     for i in range(N_iterations):
+        voitures = ordonne(voitures)
+        
+        if  i!= 0 and i % rd.randint(3,6) == 0: # on ajoute une voiture d'une manière pifométrique comme dans la vraie vie
+            voitures.append([[0,largeur_parking//2+1],[0,largeur_parking//2+1],1,False,False,False]) 
+#nb_places_libres != 0 and
 
-        
-        if i!= 0 and i % 3 == 0: # on ajoute une voiture au bout de 5s et 10s
-            voitures.append([[0,largeur_parking//2+1],[0,largeur_parking//2+1],1,False,False]) 
-        
         if len(voitures) != 0: # s'il y a des voitures sur le parking
-            for num_voiture in range(len(voitures)): # on ne peut pas faire de for num_voiture in range(len(voitures)) car voitures peut diminuer entre 2 itérations 
-                print('-----------------',num_voiture,'-----------------')
+            for num_voiture in range(len(voitures)): 
                 voiture = voitures[num_voiture]
-                if voiture != []: # si la voiture n'est pas sortie du parking
-                    #num_voiture = get_index(voiture,voitures)
-                    
-                    try:
-                        inters = intersection(voiture,parking)
-                        
-                        if len(inters) == 0 and voiture[3] == True: # si la voiture est en train de se garer
-                            voiture = avance(voiture,parking)
-                            parking[voiture[0][1],voiture[0][0]] = 3 # la place est désormais prise
-                            
-                            voiture[4] = True
+                if voiture != []: # si la voiture n'est ni sortie du parking ni garée
 
-                        elif len(inters) != 0: # si la voiture peut tourner
+                    if (voiture[0][0] > 0 or voiture[0][1]!=13) and voiture[0][0] < longueur_parking-1:
+
+                        inters = intersection(voiture,parking) # on regarde si elle fait face à une intersection
+                        
+                        if voiture[3]: # si la voiture est en train de se garer
+                            voiture = avance(voiture,parking)
+                            parking[voiture[0][1],voiture[0][0]] = 3 # la place est désormais prise (bizarre)
+                            nb_places_libres -= 1
+                            voiture[4] = True
+                            voiture[5] = False
+                            print(nb_places_libres) ###############################___
+
+                        elif len(inters) != 0: # si la voiture peut bouger et qu'elle ne se gare pas
                             place_imminente = peut_se_garer(voiture,parking)
-                            print('place imminente',place_imminente)
                             
                             if place_imminente != []: # s'il y a une place juste à côté de la voiture
 
-                                if place_imminente == ["devant"]:
+                                if place_imminente == ["devant"]: # si elle a une place de libre juste devant elle
                                     voiture = avance(voiture,parking)
 
-                                    print("coords_voit:",voiture[0][1],voiture[0][0])
                                     voiture[4] = True # la voiture est désormais garée
+                                    voiture[5] = False
 
-
-                                else:
+                                    nb_places_libres -= 1
+                                    print(nb_places_libres) ###############################___
+                                    
+                                else: # sinon elle est sur un de ses côtés et elle y tourne
                                     voiture = braque(voiture,place_imminente)
-                                    print("elle tourne pour se garer")
-                                    print("Apres avoir tourné:",voiture[0][1],voiture[0][0])
                                     voiture[3] = True # elle est en train de se garer
                                     if parking[voiture[0][1],voiture[0][0]] == 2:
                                         voiture[4] = True # la voiture est directement garée
+                                        nb_places_libres -= 1
+                                        print(nb_places_libres) ###############################___
+                                    voiture[5] = True
 
-                            elif not voiture[4] and not voiture[3]: # si la voiture n'est pas dans la procédure de garage et n'est pas non plus garée
-                                if inters == ["devant"]: # si la voiture ne peut qu'avancer
-                                    voiture = avance(voiture,parking)
-                                    print('elle avance')
+                            elif not voiture[4] and not voiture[3]: # si la voiture n'a ni place imminente, ni est dans la procédure de garage, ni est garée
+
+                                if inters == ["devant"] or voiture[5]: # si la voiture ne peut qu'avancer ou vient de tourner
+
+                                    [x_devant,y_devant] = coordonnée_pour(voiture,'devant')
+                                    if prioritaire(voiture) or not prioritaire([[x_devant,y_devant]]):
+                                        if voie_libre(voiture,parking):
+                                            voiture = avance(voiture,parking)
+                                            voiture[5] = False
+                                        else:
+                                            voiture = braque(voiture,inters) # la voiture y tourne
+                                            voiture[5] = True
+                                        
+                                    else: # si le véhicule n'est pas prioritaire il ne doit pas couper la route
+
+                                        [x_gauche_devant,y_gauche_devant] = coordonnée_pour(voiture,'gauche_devant')
+                                        [x_gauche_gauche_devant,y_gauche_gauche_devant] = coordonnée_pour(voiture,'gauche_non_contresens')
+                                        [x_droite_devant_2_cases,y_droite_devant_2_cases] = coordonnée_pour(voiture,'droite_devant_2_cases')
+                                        [x_droite_droite_devant_2_cases,y_droite_droite_devant_2_cases] = coordonnée_pour(voiture,'droite_droite_devant_2_cases')
+                                        [y_devant_devant,x_devant_devant] = coordonnée_pour(voiture,'devant_devant')
+                                        if parking[y_devant,x_devant] == 0 and parking[y_gauche_devant,x_gauche_devant] == 0 and (parking[y_gauche_gauche_devant,x_gauche_gauche_devant] != 1 or parking_ref[y_gauche_gauche_devant,x_gauche_gauche_devant] != 0) and parking[y_droite_devant_2_cases,x_droite_devant_2_cases] == 0 and parking[y_droite_droite_devant_2_cases,x_droite_droite_devant_2_cases] == 0: # si elle peut avancer
+                                            if rd.random() > 0.85: # s'il n'est pas pressé
+                                                if parking[y_devant_devant,x_devant_devant] == 0: # il regarde s'il y a une voiture en face à deux cases de lui
+                                                    voiture = avance(voiture,parking)
+                                                    voiture[5] = False
+                                            else: # monsieur est pressé donc il fonce
+                                                voiture = avance(voiture,parking)
+                                                voiture[5] = False
+
+                                        else:
+                                            pass # il attend :(
+
                                 else: # si elle peut tourner à droite ou à gauche
                                     
                                     place_dispo = place_vue(voiture,parking,inters) # on regarde s'il y a de la place disponible
 
-                                    print('elle voit une place à ', place_dispo, 'et elle peut tourner à ', inters)
+                                    if place_dispo != []: # s'il y a de la place disponible à un endroit sur ses côtés
+                                        voiture = braque(voiture,place_dispo) # la voiture y tourne
+                                        voiture[5] = True
+                                    else: # s'il n'y a pas de place
+                                        [x_devant,y_devant] = coordonnée_pour(voiture,'devant')
+                                        if prioritaire(voiture) or not prioritaire([[y_devant,x_devant]]):
+                                            if voie_libre(voiture,parking):
+                                                inters_voiture_avancée = intersection([[x_devant,y_devant],voiture[1],voiture[2]],parking)
+                                                if inters_voiture_avancée != ['devant'] and inters_voiture_avancée != ['gauche']: # si la voiture, après avoir avancé, ne peut pas avancer ni tourner à gauche, elle doit directement tourner à gauche pour ne pas faire de contresens
+                                                    voiture = braque(voiture,inters)
+                                                    voiture[5] = True
+                                                else:
+                                                    voiture = avance(voiture,parking)
+                                                    voiture[5] = False
+                                            else:
+                                                voiture = braque(voiture,inters) # la voiture y tourne
+                                                voiture[5] = True
+                                            
+                                        else: # si le véhicule n'est pas prioritaire il ne doit pas couper la route
+                                            [x_gauche_devant,y_gauche_devant] = coordonnée_pour(voiture,'gauche_devant')
+                                            [x_gauche_gauche_devant,y_gauche_gauche_devant] = coordonnée_pour(voiture,'gauche_non_contresens')
+                                            if parking[y_devant,x_devant] == 0 and parking[y_gauche_devant,x_gauche_devant] == 0 and parking[y_gauche_gauche_devant,x_gauche_gauche_devant] == 0: # si elle peut avancer
+                                                if inters != ["droite"]: # s'il doit couper 2 voies prioritaires : jamais étudié
+                                                    [x_droite_devant_2_cases,y_droite_devant_2_cases] = coordonnée_pour(voiture,'droite_devant_2_cases')
+                                                    [x_droite_droite_devant_2_cases,y_droite_droite_devant_2_cases] = coordonnée_pour(voiture,'droite_droite_devant_2_cases')
+                                                    if parking[y_droite_devant_2_cases,x_droite_devant_2_cases] == 0 and parking[y_droite_droite_devant_2_cases,x_droite_droite_devant_2_cases] == 0:
+                                                        voiture = avance(voiture,parking)
+                                                        voiture[5] = False
+                                                else:
 
-                                    if place_dispo != []:
-                                        voiture = braque(voiture,place_dispo)
-                                        print('et elle tourne')
-                                    else:
-                                        if voie_libre(voiture,parking):
-                                            voiture = avance(voiture,parking)
-                                            print('pas de place donc tourne qd meme car ne peut pas avancer')
-                                        else:
-                                            voiture = braque(voiture,inters)
-                                            print('pas de place donc continue')
-                        print(voiture)
+                                                    voiture = avance(voiture,parking)
+                                                    voiture[5] = False
+                                                    
+                                            elif parking[y_devant,x_devant] != 0: # sinon elle tourne là où elle peut
+                                                voiture = braque(voiture,inters)
+                                                voiture[5] = True
+                                            else:
+                                                if parking[y_devant,x_devant] == 0:
+                                                    voiture = avance(voiture,parking)
+                                                    voiture[5] = False
+                        else: # si la voiture ne peut pas bouger et qu'elle n'est pas en train de se garer
+                            pass # son conducteur Michel attend, bloqué dans les embouteillages
 
                         if voiture[4]:
                             voitures[num_voiture] = []
                         else:
                             voitures[num_voiture] = voiture
                         maj(voiture,parking,voiture[4])
-                        
-
-                    except IndexError: # si oob
-                        voitures[num_voiture] = []# la voiture disparaît car elle est sortie du parking
+                    
+                    else: # la voiture est sur les extrémités du parking
+                        voitures[num_voiture] = []# la voiture disparaît car elle est sortie du parking à la prochaine itération
                         maj(voiture,parking,voiture[4],True)
-                        # la voiture suivante n'est pas étudiée
-                else:
+                else: # on n'étudie pas la voiture si elle est garée ou sortie
                     pass
 
                 num_voiture += 1
@@ -382,24 +541,34 @@ def update_ani(i, tab, image): # mise à jour de l'animation
     
     return True
 
-N_iterations = 50
+N_iterations = 600
 
-nb_files_doubles = 31 # nombre de files d'emplacements coupant la route principale
-nb_emplacements_par_file = 15
+nb_files_doubles = 5 # nombre de files d'emplacements coupant la route principale
+nb_emplacements_par_file = 10
 
 longueur_parking = 1 + 2 + 3*nb_files_doubles # pas de file à l'entrée + double file à sortie + à chaque file simple sont associées 3 cases: (2 places + la file) 
 largeur_parking = 4 + 2 + 2*nb_emplacements_par_file # doubles files à chaque fin de file + route principale + symétrie
 
-voiture = [[0,largeur_parking//2+1],[0,largeur_parking//2+1],1,False,False] # voiture = [[x_av,y_av],[ex_x_ar,ex_y_ar],alpha,etat_si_en_train_de_se_garer,si_garee
-
+voiture = [[0,largeur_parking//2+1],[0,largeur_parking//2+1],1,False,False,False] # voiture = [[x_av,y_av],[ex_x_ar,ex_y_ar],alpha,etat_si_en_train_de_se_garer,si_garee,si_vient_de_tourner
 voitures = [voiture]
 
-parking = init_parking(longueur_parking,largeur_parking)
-parking_ref = init_parking(longueur_parking,largeur_parking)
+nv_config = input('New config ? (y/n) ')
+if nv_config != 'y':
+    nom_config = input('Name of file : ')
 
+    parking_ref = ouverture_parking(nom_config)
+    parking = ouverture_parking(nom_config)
+else:
+    
+    parking_ref = init_parking(longueur_parking,largeur_parking)
+    parking = init_parking(longueur_parking,largeur_parking)
+
+    np.savetxt("{}.txt".format(rd.random()), parking) # on sauvegarde la configuration du parking
 
 tab = np.zeros((N_iterations,largeur_parking+2,longueur_parking))
 
-simulation(voitures,parking,tab,N_iterations)
+nb_places_libres = np.count_nonzero(parking == 2)
+
+simulation(voitures,parking,nb_places_libres,tab,N_iterations)
 
 affichage(tab)
