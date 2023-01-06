@@ -76,7 +76,8 @@ def creation_random_parking(longueur_parking,largeur_parking):
     P = []
     for _ in range(largeur_parking):
         for __ in range(longueur_parking):
-            P.append([randint(-1,1),True,True,True,True])
+            P.append([1,True,True,True,True])
+            #P.append([randint(-1,1),True,True,True,True])
             #P.append([randint(-1,1),[True,False][randint(0,1)],[True,False][randint(0,1)],[True,False][randint(0,1)],[True,False][randint(0,1)]])
     
     P[longueur_parking*(largeur_parking//2)][0] = 0 # on impose que l'entrée ne soit pas condamnée
@@ -87,45 +88,55 @@ def creation_random_parking(longueur_parking,largeur_parking):
     for i in range(5):
         parking[i] = P[:,i].reshape((largeur_parking,longueur_parking))
 
-    ajoute_routes(parking,NB_ROUTES_GEN)
+    for _ in range(NB_ROUTES_GEN):
+        ajoute_route(parking,largeur_parking//2,0,largeur_parking//2,longueur_parking-1)
 
     return parking
 
-def ajoute_routes(parking,nb_routes):
+def ajoute_route(parking,i0,j0,i1,j1): # crée une route liant (i0,j0) à (i1,j1)
     longueur,largeur = longueur_parking,largeur_parking
 
-    for _ in range(nb_routes):
-        i_rempl,j_rempl = largeur//2,0
-        dir_choisie = [1,2,4][randint(0,2)]
-        while i_rempl != largeur//2 or j_rempl != longueur-1:
-            
-            parking[dir_choisie][i_rempl,j_rempl] = True # la prochaine case où il y aura de la route est accessible 
+    dir_choisie = [1,2,4][randint(0,2)]
+    i_rempl,j_rempl = i0,j0
+    while i_rempl != i1 or j_rempl != j1:
+        parking[dir_choisie][i_rempl,j_rempl] = True # la prochaine case où il y aura de la route est accessible 
 
-            if j_rempl == longueur-1:
-                if i_rempl <= largeur//2: #skip softlock
-                    i_rempl += 1
-                    dir_choisie = 4
-                else:
-                    i_rempl -= 1
-                    dir_choisie = 2
-
-            elif dir_choisie == 1 and j_rempl < longueur-1:
-                j_rempl += 1
-                dir_choisie = [1,2,4][randint(0,2)]
-
-            elif dir_choisie == 2 and i_rempl > 0:
-                i_rempl -= 1
-                dir_choisie = [1,2][randint(0,1)]
-
-            elif i_rempl < largeur-1:
+        if j_rempl == j1: # si les coordonnées de remplissage de route sont sur la même colonne que le pt d'arrivee
+            if i_rempl <= i1: # il monte ou descend pour rejoindre le point d'arrivée
                 i_rempl += 1
-                dir_choisie = [1,4][randint(0,1)]
-            
-            elif i_rempl == largeur-1:
-                j_rempl += 1
-                dir_choisie = [1,2][randint(0,1)]
+                dir_choisie = 4
+            else:
+                i_rempl -= 1
+                dir_choisie = 2
 
-            parking[0][i_rempl,j_rempl] = 0
+        elif dir_choisie == 1 and j_rempl < j1: # sinon il avance s'il peut
+            j_rempl += 1
+            dir_choisie = [1,2,4][randint(0,2)]
+
+        elif dir_choisie == 2 and i_rempl > 0: # sinon il monte s'il peut
+            i_rempl -= 1
+            dir_choisie = [1,2][randint(0,1)]
+
+        elif i_rempl < largeur-1: # sinon il descend s'il peut
+            i_rempl += 1
+            dir_choisie = [1,4][randint(0,1)]
+        
+        elif i_rempl == largeur-1: # sauf s'il est arrivé en bas il longe le bords au début
+            j_rempl += 1
+            dir_choisie = [1,2][randint(0,1)]
+        #print(i_rempl,j_rempl)
+        parking[0][i_rempl,j_rempl] = 0
+
+def ajoute_morceau_route(parking,i0,j0,sens_ajout): # crée une route liant (i0,j0) à (i1,j1)
+    j1 = randint(-1,1)
+    if sens_ajout == 'haut':
+        i1 = randint(-3,-1)
+    else:
+        i1 = randint(1,3)
+    if j0 <= j1 :
+        ajoute_route(parking,i0,j0,i1,j1)  
+    else: # a fixer si je mets les sens ( les booléens sont mal mis ds ce cas)
+        ajoute_route(parking,i1,j1,i0,j0)
 
 def dijkstra(parking, i1, j1, i2, j2):
     """
@@ -343,7 +354,7 @@ def nb_places_bords_route(parking):
 
     return coords_places
 
-def coordonnees_coupage(i_coup,j_coup,parking,sens_allongement,coords_route): # donne coords sur bordure inf ou sup de la route principale 
+def coordonnees_coupage(i_coup,j_coup,parking,lieu_allongement,coords_route): # donne coords sur bordure inf ou sup de la route principale 
     longueur = longueur_parking
     largeur = largeur_parking
 
@@ -359,7 +370,7 @@ def coordonnees_coupage(i_coup,j_coup,parking,sens_allongement,coords_route): # 
             
     if lieu_allongement == 'haut':
         while (i_coup-1,j_coup) in coords_route and i_coup-1 > 0:
-            i_coup += 1
+            i_coup -= 1
     return (i_coup,j_coup)
     
 def selection(liste_parkings,nb_parkings): # ajouter un coeff à chaque parking (fromage)
@@ -401,7 +412,7 @@ def croisement(liste_parkings,nb_parkings): # prendre plutôt autour route père
         liste_parkings.append(enfant1)
         liste_parkings.append(enfant2)
     
-def mutation(liste_parkings): # changer en modifiant la route et en ajoutant un ptit bout de route
+def mutation(liste_parkings): # remove l'ancien bout de route
     """
     De façon aléatoire, chaque parking a pour chaque chromosome une toute petite probabilité d'avoir un gène qui mute aléatoirement
     """
@@ -411,21 +422,22 @@ def mutation(liste_parkings): # changer en modifiant la route et en ajoutant un 
     for parking in liste_parkings:
         
         coords_route = coordonnees_route(parking)
-        sens_allongement = ['haut','bas'][randint(0,1)] # on ajoute de la route en haut ou en bas
-        (i_coup1,j_coup1) , (i_coup2,j_coup2) = coords_route[randint(0,len(coords_route)-1)] , coords_route[randint(0,len(coords_route)-1)] # coords prises aléatoirement sur route principale
-        (i_coup1,j_coup1) , (i_coup2,j_coup2) = coordonnees_coupage(i_coup1,j_coup1,parking,sens_allongement,coords_route) , coordonnees_coupage(i_coup2,j_coup2,parking,sens_allongement,coords_route)
 
+        # déviation d'une partie de la route
+        (i_coup1,j_coup1) , (i_coup2,j_coup2) = coords_route[randint(0,len(coords_route)-1)] , coords_route[randint(0,len(coords_route)-1)] # coords prises aléatoirement sur route principale
+        sens_allongement = ['haut','bas'][randint(0,1)] # on ajoute de la route en haut ou en bas
+        (i_coup1,j_coup1) , (i_coup2,j_coup2) = coordonnees_coupage(i_coup1,j_coup1,parking,sens_allongement,coords_route) , coordonnees_coupage(i_coup2,j_coup2,parking,sens_allongement,coords_route)
+        if j_coup1 <= j_coup2:
+            ajoute_route(parking,i_coup1,j_coup1,i_coup2,j_coup2)
+        else:
+            ajoute_route(parking,i_coup2,j_coup2,i_coup1,j_coup1)
+
+        # ajout d'un morceau de la route
+        (i_ajout,j_ajout) = coords_route[randint(0,len(coords_route)-1)]
+        sens_ajout = ['haut','bas'][randint(0,1)] # on ajoute de la route en haut ou en bas
+        (i_ajout,j_ajout) = coordonnees_coupage(i_ajout,j_ajout,parking,sens_ajout,coords_route)
+        ajoute_morceau_route(parking,i_ajout,j_ajout,sens_ajout)
         
-        
-        #for i in range(len(parking[0][:,0])):
-        #    for j in range(len(parking[0][0])):
-        #        if (i,j) != (largeur_parking//2,0) and (i,j) != (largeur_parking//2,longueur_parking-1):
-        #            num_gene = randint(0,4) # on choisit aléatoirement un gène
-        #            if random()<PROBA_MUTATION:
-        #                if num_gene == 0:
-        #                    parking[I_TYPE_CASE][i,j] = randint(-1,1)
-        #                else:
-        #                    parking[num_gene][i,j] = not(parking[num_gene][i,j])
 
 def evolution(N_parkings,N_generations):
     '''
@@ -444,6 +456,8 @@ def evolution(N_parkings,N_generations):
     meilleur_parking = pop_parkings[0]
     print(nb_places_bords_route(meilleur_parking))
     affichage(meilleur_parking)
+    mutation(pop_parkings)
+    affichage(pop_parkings[0])
     #affichage_loop(tab)
 
     return meilleur_parking
