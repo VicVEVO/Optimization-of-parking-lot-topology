@@ -1,27 +1,11 @@
 '''
 Programme de base simulant une seule voiture dans parking avec une infrastructure donnée (deux voies, entrée à l'opposé de sortie).
-Il y a la procédure de garage
 
 21/09: implémentation de l'architecture du parking dans le programme, simulation d'une voiture qui avance (seulement).
 12/10: implémentation de la recherche de places lorsque la voiture avance, et tourne en respectant sens circulation si elle voit une place 
 19/10: implémentation de la procédure de garage totale terminée
 26/10: en fait gros pbs qd y'a bcp de voitures: 5 problèmes répertoriés
 08/11: fixage de pbs et ajout variable -nb_places_dispo- tq quand plus de places les voiturent non garées sortent
-
-
-À changer: fix cas où on tourne deux fois d'affilée: on tourne 2 fois d'affilée ssi on ne peut pas aller ensuite tout droit (cas normalement jamais réalisé)
-
-PROBLEMES RENCONTRÉS:
-Dans quel sens balayer/étudier voitures ?
-    >> d'abord celles qui se garent
-    >> puis..?
-
-
-
-Idées pour rendre prog plus réaliste:
-- Pour parking souterrain, il y a des poteaux
-- Faire étages ?
-- comportements humains: se mettent random, freinent random
 '''
 
 import numpy as np
