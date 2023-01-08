@@ -7,15 +7,15 @@ import time,copy
 ### CONSTANTES #########################################################
 
 I_TYPE_CASE = 0
-N_ITERATIONS = 40
-DUREE_GARAGE = 5 #s/iterations
+N_ITERATIONS = 100
+DUREE_GARAGE = 50 #s/iterations
 PROBA_MUTATION = 0.005
 longueur_parking = 10
 largeur_parking = 10
 I_SORTIE,J_SORTIE = largeur_parking//2,longueur_parking-1
 NB_ROUTES_GEN = 1
 N_parkings = 100
-N_generations = 700
+N_generations = 20
 
 ### FONCTIONS GENERALES ################################################
 
@@ -76,8 +76,8 @@ def creation_random_parking(longueur_parking,largeur_parking):
     P = []
     for _ in range(largeur_parking):
         for __ in range(longueur_parking):
-            P.append([1,True,True,True,True])
-            #P.append([randint(-1,1),True,True,True,True])
+            #P.append([1,True,True,True,True])
+            P.append([randint(-1,1),True,True,True,True])
             #P.append([randint(-1,1),[True,False][randint(0,1)],[True,False][randint(0,1)],[True,False][randint(0,1)],[True,False][randint(0,1)]])
     
     P[longueur_parking*(largeur_parking//2)][0] = 0 # on impose que l'entrée ne soit pas condamnée
@@ -98,8 +98,7 @@ def enleve_route(parking,i0,j0,i1,j1,coords_route):
     for j in range(j0,j1):
         for i in range(largeur_parking):
             if (i,j) in coords_route:
-                parking[0][i,j] = [-1,2][randint(0,1)]
-
+                parking[0][i,j] = [-1,1][randint(0,1)]
 
 def ajoute_route(parking,i0,j0,i1,j1): # crée une route liant (i0,j0) à (i1,j1)
     longueur,largeur = longueur_parking,largeur_parking
@@ -133,7 +132,6 @@ def ajoute_route(parking,i0,j0,i1,j1): # crée une route liant (i0,j0) à (i1,j1
         elif i_rempl == largeur-1: # sauf s'il est arrivé en bas il longe le bords au début
             j_rempl += 1
             dir_choisie = [1,2][randint(0,1)]
-        #print(i_rempl,j_rempl)
         parking[0][i_rempl,j_rempl] = 0
 
 def ajoute_morceau_route(parking,i0,j0,sens_ajout,coords_route): # ajoute un bloc de route au dessus ou en dessus de (i0,j0)
@@ -302,8 +300,92 @@ def simulation(parking):
                     
             voitures[num_voiture] = voiture
 
-    if T_moy_sortie == 0:
-        T_moy_sortie = 100000
+    if T_moy_sortie == 0: # si malencontreusement aucune voiture n'arrive à sortir
+        T_moy_sortie = 100000 # on met un score disqualificatoire
+    
+    return T_moy_garage,T_moy_sortie,parking_ref
+    
+def simulation2(parking): # tester avec 2 dijkstra (un pour trouver place la plus proche puis l'autre pour sortir)
+    """
+    Simule les tutures
+    """
+    chemins_sortie = etapes_sortie(parking)
+    places_dispo = places_bords_route(parking)
+    voitures = [[[largeur_parking//2,0],1,False]] # [(i,j), direction, est_garee]
+    parking_ref = copy.deepcopy(parking)
+    Ntot_voitures = N_ITERATIONS//3 + 1 # nb total de voitures qui apparaîtront
+    T_moy_garage , T_moy_sortie = 0 , 0
+    
+    for i in range(N_ITERATIONS):
+        tab[i] = parking[0] # pour afficher en loop
+        if i%3==0 and i != 0: # apparition d'une nouvelle voiture
+            voitures.append([[largeur_parking//2,0],1,False])
+
+        for num_voiture in range(len(voitures)):
+            voiture = voitures[num_voiture]
+
+            if voiture: # si la voiture n'est pas arrivée
+                [i,j] = voiture[0]
+
+                if not voiture[2]: # si la voiture n'est pas garée
+                    direction = voiture[1]
+
+                    parking[0][voiture[0][0],voiture[0][1]] = np.copy(parking_ref[0])[voiture[0][0],voiture[0][1]]
+
+                    candidats_dir_dispo = directions_dispo(i,j,direction,parking)
+                    direction_opposee = direction + 2
+                    if direction_opposee > 4:
+                        direction_opposee %= 4
+
+                    dir_dispo , dir_place = [] , []
+
+                    for num_dir in range(len(candidats_dir_dispo)): # on teste chaque direction autour de la voiture
+                        if num_dir != direction_opposee:
+                            i_dir,j_dir = candidats_dir_dispo[num_dir][1],candidats_dir_dispo[num_dir][2]
+                            
+                            if candidats_dir_dispo[num_dir][0] and 0 <= parking[0][i_dir,j_dir] <= 1: # si la case est accessible règlementairement et physiquement
+                                if parking[0][i_dir,j_dir] == 1: # si c'est une place
+                                    dir_place.append([candidats_dir_dispo[num_dir][1],candidats_dir_dispo[num_dir][2],num_dir+1])
+                                else: # si c'est de la route
+                                    dir_dispo.append([candidats_dir_dispo[num_dir][1],candidats_dir_dispo[num_dir][2],num_dir+1])
+                    
+                    if dir_place != []: # la voiture va en priorité à la place s'il y en a une
+                        voiture = [[dir_place[0][0],dir_place[0][1]],dir_place[0][2],True]
+                    elif dir_dispo != []: # sinon elle avance aléatoirement là où elle peut
+                        choix_alea = randint(0,len(dir_dispo)-1)
+                        voiture = [[dir_dispo[choix_alea][0],dir_dispo[choix_alea][1]],dir_dispo[choix_alea][2],False]
+ 
+                    T_moy_garage += 1/Ntot_voitures
+                    parking[0] = copy.deepcopy(parking[0]) # éviter aliasing et changer valeur parking_ref
+                    parking[0][voiture[0][0],voiture[0][1]] = 2
+
+                else: # si la voiture est garée, elle suit un chemin prédéfini pour sortir
+                    if len(voiture) == 3: # si la voiture vient juste de se garer
+                        chemin_sortie = chemins_sortie[i,j] # (i,j) et voiture (j,i)
+                        voiture.append(chemin_sortie)
+                        voiture.append(-DUREE_GARAGE)
+                    
+                    T_moy_sortie += 1/Ntot_voitures
+                    if voiture[4] != len(voiture[3]): # si la voiture n'est pas arrivée
+                        if voiture[4] > 0: # si la voiture veut partir et qu'il n'y a pas d'autre voiture sur la case
+                            [i_nv,j_nv] = voiture[3][voiture[4]]
+
+                            if parking[0][i_nv,j_nv] != 2:
+                                parking[0][voiture[0][0],voiture[0][1]] = np.copy(parking_ref[0])[voiture[0][0],voiture[0][1]]
+                                voiture[0] = [i_nv,j_nv] # on change les coordonnées de la voiture
+                                parking[0] = copy.deepcopy(parking[0])
+                                parking[0][voiture[0][0],voiture[0][1]] = 2
+
+                        voiture[4] += 1 # l'indice_etape_sortie augmente de 1
+
+                    else: # si la voiture est arrivée devant la sortie
+                        parking[0][i,j] = np.copy(parking_ref[0])[i,j]
+                        voiture = [] # il faut trouver un moyen de vanish les tutures
+                    
+            voitures[num_voiture] = voiture
+
+    if T_moy_sortie == 0: # si malencontreusement aucune voiture n'arrive à sortir
+        T_moy_sortie = 100000 # on met un score disqualificatoire
     
     return T_moy_garage,T_moy_sortie,parking_ref
 
@@ -331,10 +413,11 @@ def score(parking): # changer poids avec des exemples jvais voir tqt
         On renvoie aussi la configuration du parking vide
     """
 
-    nb_places_acc = nb_places_bords_route(parking)
+    nb_places_acc = len(places_bords_route(parking))
     t_moy_garage,t_moy_sortie,parking_ref = simulation(parking)
+    #print(t_moy_garage,t_moy_sortie,nb_places_acc)
     return t_moy_garage + t_moy_sortie - nb_places_acc, parking_ref
-
+    #return -nb_places_acc,parking
 
 def coordonnees_route(parking):
     # algorithme de parcours en profondeur
@@ -355,7 +438,7 @@ def coordonnees_route(parking):
     coordos = parcours_profondeur(parking,i_bal,j_bal)
     return coordos
 
-def nb_places_bords_route(parking):
+def places_bords_route(parking):
     longueur,largeur = longueur_parking,largeur_parking
     coords_places = []
     
@@ -386,9 +469,9 @@ def coordonnees_coupage(i_coup,j_coup,parking,lieu_allongement,coords_route): # 
             i_coup -= 1
     return (i_coup,j_coup)
     
-def selection(liste_parkings,nb_parkings): # ajouter un coeff à chaque parking (fromage)
+def selection(liste_parkings,nb_parkings,etape):
     """
-    Sélectionne la moitié des meilleurs parkings selon leur score
+    Sélectionne chaque parking avec un nombre de copies proportionnel à son score
     """
     resultats = []
 
@@ -398,32 +481,82 @@ def selection(liste_parkings,nb_parkings): # ajouter un coeff à chaque parking 
 
     resultats = np.array(resultats,dtype=object)
     resultats = resultats[resultats[:,0].astype(int).argsort()]
-
-    premiers_meilleurs = [resultats[i][1] for i in range(nb_parkings//2)] # on garde la moitié des meilleurs parkings
     
-    return premiers_meilleurs
+    if etape == 'etape1':
+        meilleur_score = resultats[0][0]
+        coeff_meilleur_parking = 2**len(str(nb_parkings))
 
+        meilleurs_parkings_ponderes = [resultats[0][1]] # on garde d'abord une sauvegarde du meilleur parking
+        for i in range(nb_parkings):
+            poids = int(coeff_meilleur_parking*resultats[i][0]/meilleur_score)
+            if poids >= coeff_meilleur_parking - 1:
+                meilleurs_parkings_ponderes += [resultats[i][1]] * poids
+            else:
+                meilleurs_parkings_ponderes += [resultats[i][1]]
 
-def croisement(liste_parkings,nb_parkings): # prendre plutôt autour route père et reste mère et inversement
-    """
-    Procédure croisant les chromosomes des parkings
-    Regroupés par couples, chaque paire de parkings sélectionnés croisent leur chromosomes pour donner 2 enfants
-    On fait le beau découpage proposé par Mr Poirier le boss
-    """
-    for i in range(0,nb_parkings//2,2): # pas prendre les 2 parkings à côté
-        parent1 , parent2 = liste_parkings[i] , liste_parkings[i+1]
-        i_coupage,j_coupage = randint(0,longueur_parking-1),randint(0,largeur_parking-1)
+        return meilleurs_parkings_ponderes # on les renvoie d'abord tous car un bon parking mixé avec un mauvais peut être excellent
+    
+    return [resultats[i][1] for i in range(N_parkings)]
+
+def couplage_croisement(liste_parkings):
+    liste_couples =[]
+    ind_pere = 0
+    ind_mere = 0
+    indices_pris = []
+    indice_lim = len(liste_parkings) - 1
+    while ind_mere < len(liste_parkings):
+
+        ind_mere = ind_pere + 1
+        parking_pere = liste_parkings[ind_pere]
+
+        while ind_mere <= indice_lim and (liste_parkings[ind_mere] == parking_pere or (parking_pere,liste_parkings[ind_mere]) in liste_couples):
+            ind_mere += 1
+
+        if ind_mere > indice_lim:
+            break
+
+        parking_mere = liste_parkings[ind_mere]
+        liste_couples.append((parking_pere,parking_mere))
+
+        indices_pris.append(ind_pere)
+        indices_pris.append(ind_mere)
         
-        #enfant1 = np.array([np.concatenate((parent1[k][:largeur_parking//2],parent2[k][largeur_parking//2:])) for k in range(5)])
-        #enfant2 = np.array([np.concatenate((parent2[k][:largeur_parking//2],parent1[k][largeur_parking//2:])) for k in range(5)])
-        enfant1 , enfant2 = np.copy(parent1) , np.copy(parent2)
-
-        for k in range(5):
-            enfant1[k][:i_coupage,:j_coupage] = parent2[k][:i_coupage,:j_coupage]
-            enfant2[k][:i_coupage,:j_coupage] = parent1[k][:i_coupage,:j_coupage]
+        while ind_pere in indices_pris:
+            ind_pere += 1
         
-        liste_parkings.append(enfant1)
-        liste_parkings.append(enfant2)
+        if ind_pere > indice_lim:
+            break
+        
+    return liste_couples   
+
+def croisement(liste_parkings):
+    """
+    Croisement (merci la description)
+    """
+    liste_couples_parkings = couplage_croisement(liste_parkings)
+    grosse_liste_parkings = []
+
+    for (pere, mere) in liste_couples_parkings:
+        coordonnees_route_pere, coordonnees_route_mere = coordonnees_route(pere), coordonnees_route(mere)
+        fils1, fils2, fille1, fille2 = copy.deepcopy(pere), copy.deepcopy(pere), copy.deepcopy(mere), copy.deepcopy(mere)
+        for i in range(largeur_parking):
+            for j in range(longueur_parking):
+                if (i,j) in coordonnees_route_pere:
+                    fils1[0][i,j] = pere[0][i,j] # le fils 1 hérite de la route du père
+                    fils2[0][i,j] = mere[0][i,j] # le fils 2 hérite du reste de la mère
+                else:
+                    fils1[0][i,j] = pere[0][i,j]
+                    fils2[0][i,j] = mere[0][i,j]
+
+                if (i,j) in coordonnees_route_mere:
+                    fille1[0][i,j] = pere[0][i,j] # la fille 1 hérite de la route de la mère
+                    fille2[0][i,j] = mere[0][i,j] # la fille 2 hérite du reste du père
+                else:
+                    fille1[0][i,j] = pere[0][i,j]
+                    fille2[0][i,j] = mere[0][i,j]
+        
+        grosse_liste_parkings += [pere,mere,fils1,fils2,fille1,fille2]
+    return grosse_liste_parkings
     
 def mutation(liste_parkings):
     """
@@ -432,53 +565,56 @@ def mutation(liste_parkings):
     longueur = longueur_parking
     largeur = largeur_parking
 
-    for parking in liste_parkings:
-        
+    for num_parking in range(1,len(liste_parkings)): # on ne mute pas le premier pour le garder intact
+        parking = liste_parkings[num_parking]
         coords_route = coordonnees_route(parking)
 
         # déviation d'une partie de la route
-        (i_coup1,j_coup1) , (i_coup2,j_coup2) = coords_route[randint(0,len(coords_route)-1)] , coords_route[randint(0,len(coords_route)-1)] # coords prises aléatoirement sur route principale
-        sens_allongement = ['haut','bas'][randint(0,1)] # on ajoute de la route en haut ou en bas
-        (i_coup1,j_coup1) , (i_coup2,j_coup2) = coordonnees_coupage(i_coup1,j_coup1,parking,sens_allongement,coords_route) , coordonnees_coupage(i_coup2,j_coup2,parking,sens_allongement,coords_route)
-        
-        print((i_coup1,j_coup1) , (i_coup2,j_coup2))
-
-        if j_coup1 <= j_coup2:
-            enleve_route(parking,i_coup1,j_coup1,i_coup2,j_coup2,coords_route)
+        if len(coords_route) == 0:
+            (i_coup1,j_coup1), (i_coup2,j_coup2) = (largeur//2,0), (largeur//2,longueur-1)
             ajoute_route(parking,i_coup1,j_coup1,i_coup2,j_coup2)
+            coords_route = coordonnees_route(parking)
+
         else:
-            enleve_route(parking,i_coup2,j_coup2,i_coup1,j_coup1,coords_route)
-            ajoute_route(parking,i_coup2,j_coup2,i_coup1,j_coup1)
+            (i_coup1,j_coup1) , (i_coup2,j_coup2) = coords_route[randint(0,len(coords_route)-1)] , coords_route[randint(0,len(coords_route)-1)] # coords prises aléatoirement sur route principale
+            sens_allongement = ['haut','bas'][randint(0,1)] # on ajoute de la route en haut ou en bas
+            (i_coup1,j_coup1) , (i_coup2,j_coup2) = coordonnees_coupage(i_coup1,j_coup1,parking,sens_allongement,coords_route) , coordonnees_coupage(i_coup2,j_coup2,parking,sens_allongement,coords_route)
+
+            if j_coup1 <= j_coup2:
+                enleve_route(parking,i_coup1,j_coup1,i_coup2,j_coup2,coords_route)
+                ajoute_route(parking,i_coup1,j_coup1,i_coup2,j_coup2)
+            else:
+                enleve_route(parking,i_coup2,j_coup2,i_coup1,j_coup1,coords_route)
+                ajoute_route(parking,i_coup2,j_coup2,i_coup1,j_coup1)
 
         # ajout d'un morceau de la route
         (i_ajout,j_ajout) = coords_route[randint(0,len(coords_route)-1)]
         sens_ajout = ['haut','bas'][randint(0,1)] # on ajoute de la route en haut ou en bas
         (i_ajout,j_ajout) = coordonnees_coupage(i_ajout,j_ajout,parking,sens_ajout,coords_route)
-        print((i_ajout,j_ajout),sens_ajout)
         ajoute_morceau_route(parking,i_ajout,j_ajout,sens_ajout,coords_route)
         
+        liste_parkings[num_parking] = parking
 
 def evolution(N_parkings,N_generations):
     '''
     Algorithme génétique pour une population de N parking.
     '''
     tab = np.zeros((N_generations,largeur_parking,longueur_parking))
+    pop_parkings = [creation_random_parking(longueur_parking,largeur_parking)for _ in range(N_parkings)] # population initiale: on crée N parkings (durée: 0.06s)
 
-    pop_parkings = [creation_random_parking(longueur_parking,largeur_parking)for _ in range(1)] # population initiale: on crée N parkings (durée: 0.06s)
-
-    #for _ in range(N_generations):
-    #    pop_parkings = selection(pop_parkings,N_parkings)
-    #    croisement(pop_parkings,N_parkings)
-    #    mutation(pop_parkings)
-    #    tab[_] = pop_parkings[0][0] # affichage de l'évolution
+    for _ in range(N_generations):
+        pop_parkings = selection(pop_parkings,N_parkings,'etape1')
+        pop_parkings = croisement(pop_parkings)
+        mutation(pop_parkings)
+        print(len(pop_parkings))
+        pop_parkings = selection(pop_parkings,len(pop_parkings),'etape2')
+        tab[_] = pop_parkings[0][0] # affichage de l'évolution
     
     meilleur_parking = pop_parkings[0]
-    print(nb_places_bords_route(meilleur_parking))
+    
+    affichage_loop(tab)
     affichage(meilleur_parking)
-    mutation(pop_parkings)
-    affichage(pop_parkings[0])
-    #affichage_loop(tab)
-
+    
     return meilleur_parking
 
 ### FONCTION D'AFFICHAGE ###############################################
@@ -527,12 +663,7 @@ def update_ani(i, tab, image):
 
 parking_final = evolution(N_parkings,N_generations)
 
-'''
-P = parking_cool_test(longueur_parking,largeur_parking-2)
-
-tab = np.zeros((N_ITERATIONS,largeur_parking,longueur_parking))
-
-simulation(P,np.copy(P))
-
-affichage_loop(tab)
-'''
+"""tab = np.zeros((N_ITERATIONS,largeur_parking+2,longueur_parking))
+P_test = parking_cool_test(longueur_parking,largeur_parking)
+print(score(P_test))
+affichage_loop(tab)"""
