@@ -1,8 +1,3 @@
-"""
-À changer:
-"""
-
-
 from fonctions_techniques import *
 from constantes import *
 from fonctions_affichage import *
@@ -14,9 +9,32 @@ from copy import deepcopy
 def creationRandomParking(longueur,largeur):
     return np.random.randint(-1, 2, size=(largeur, longueur))
 
+def _parking_cool_test(longueur,largeur):
+    
+    bords = -np.ones(longueur,dtype=int)
+
+    parking = -np.ones((largeur,longueur),dtype=int)
+    
+    for x in range(3,longueur-1):
+        if x%4 == 1 or x%4 == 2:
+            for y in range(2,largeur-2):
+                parking[y,x] = 1
+        else:
+            parking[:,x] = 0 # files vides
+
+    parking[largeur//2],parking[largeur//2-1] = 0,0 # création de la route principale 
+    parking[0,3:-1],parking[1,3:-1],parking[-1,3:-1],parking[-2,3:-1] = 0,0,0,0 # création des routes des fins de files
+
+    parking = np.append(bords,parking).reshape(largeur+1,longueur)
+    parking = np.append(parking,bords).reshape(largeur+2,longueur)
+
+    return np.array(parking)
+
 def simulation(parking):
+    #evolParkings = np.zeros((N_ITERATIONS,LARGEUR_PARKING+2,LONGUEUR_PARKING))
     voitures = []
     parkingSim = deepcopy(parking)
+    coordsPlacesAccess = placesBordsRoute(parking)
     tMoyGarage,tMoySortie = 0,0
 
     for k in range(N_ITERATIONS):
@@ -24,8 +42,9 @@ def simulation(parking):
             voitures.append([(I_ENTREE,J_ENTREE),False])
         for numVoiture in range(len(voitures)):
             if voitures[numVoiture]: # si la voiture n'est pas arrivée
-                voitures[numVoiture], tMoyGarage, tMoySortie = nvVoiture(voitures[numVoiture],parkingSim,parking,tMoyGarage,tMoySortie)
-
+                voitures[numVoiture], tMoyGarage, tMoySortie = nvVoiture(voitures[numVoiture],parkingSim,parking,coordsPlacesAccess,tMoyGarage,tMoySortie)
+        #evolParkings[k] = parkingSim
+    #affichageLoop(evolParkings)
     return tMoyGarage
 
 def score(parking):
@@ -45,9 +64,9 @@ def score(parking):
     sortieDansRoute = np.any(np.all([I_SORTIE,J_SORTIE] == coordsRoute, axis=1))
 
     if sortieDansRoute:
-        #x = simulation(parking)
-        nbPlacesAccessibles = len(placesBordsRoute(parking))
-        scoreConnexité = 1-nbPlacesAccessibles
+        scoreDuree = simulation(parking)
+        #nbPlacesAccessibles = len(placesBordsRoute(parking))
+        scoreConnexité = 1-100/scoreDuree
     else:
         tailleRoute = len(coordsRoute)
         scoreConnexité = 1+1/(tailleRoute) # tend vers 1 pour un bon parking
@@ -62,10 +81,13 @@ def selectionPopParkings(popParkingsxScore):
         parking = popParkingsxScore[numParking][0]
         scoreParking = score(parking)
         resultats.append([parking,scoreParking])
-    
+
     resultats = np.array(resultats,dtype=object)
     resultats = resultats[resultats[:,1].argsort()] # on trie les parkings par score croissant
-    return ([(resultats[i][0],resultats[i][1]) for i in range(N_PARKINGS//2)],deepcopy(resultats[0])) # on renvoie (parkings,score)
+
+    meilleurParking1 = deepcopy(resultats[0]) # on garde des sauvegardes des 2 meilleurs
+    meilleurParking2 = deepcopy(resultats[1])
+    return ([(meilleurParking1[0],meilleurParking1[1])]+[(meilleurParking2[0],meilleurParking2[1])]+[(resultats[i][0],resultats[i][1]) for i in range(N_PARKINGS//2-2)]) # on renvoie les (parkings,score)
 
 def croisementMauvais(P1,scoreP1,P2,scoreP2):
         iCoupage,jCoupage = randint(0,LARGEUR_PARKING-1),randint(J_ENTREE,J_SORTIE)
@@ -97,7 +119,7 @@ def croisementParkings(popParkingsxScores):
         else:
             parkingsAjout = croisementMauvais(pere,scorePere,mere,scoreMere)
         grosseListeParkings += parkingsAjout
-        
+    
     return grosseListeParkings
 
 def mutationMauvais(parking):
@@ -117,14 +139,12 @@ def mutationBon(parking):
     (iCoup1,jCoup1) = coordsRoute[coordsRoute[:,1] >= randint(0,LARGEUR_PARKING-2)][0]
     (iCoup2,jCoup2) = coordsRoute[coordsRoute[:,1] >= randint(jCoup1+1,LARGEUR_PARKING-1)][0] # on choisit d'autres coordonnées
     (iCoup1,jCoup1) , (iCoup2,jCoup2) = coordonneesFrontiere(iCoup1,jCoup1,parking,sensAllongement) , coordonneesFrontiere(iCoup2,jCoup2,parking,sensAllongement)
-    print(len(coordsRoute))
-    affichage(parking)
     enleveRoute(parking,iCoup1,jCoup1,iCoup2,jCoup2,coordsRoute,sensAllongement)
     ajouteRoute(parking,iCoup1,jCoup1,iCoup2,jCoup2)
     return parking
 
 def mutationParkings(popParkingsxScore):
-    for numParking in range(N_PARKINGS):
+    for numParking in range(2,N_PARKINGS):
         (parking,score) = popParkingsxScore[numParking]
         if score > 1:
             mutationMauvais(parking)
@@ -134,21 +154,29 @@ def mutationParkings(popParkingsxScore):
     return popParkingsxScore
 
 def evolutionGenetique():
+
     popParkingsxScores = [(creationRandomParking(LONGUEUR_PARKING,LARGEUR_PARKING),0) for _ in range(N_PARKINGS)]
+    EvolScores = np.empty(N_GENERATIONS)
     evolParkings = np.zeros((N_GENERATIONS,LARGEUR_PARKING,LONGUEUR_PARKING))
+
     for _ in range(N_GENERATIONS):
-        (popParkingsxScores,meilleurActuel) = selectionPopParkings(popParkingsxScores)
+        popParkingsxScores = selectionPopParkings(popParkingsxScores)
+        meilleurActuel = popParkingsxScores[0]
+
         popParkingsxScores = croisementParkings(popParkingsxScores)
+
         popParkingsxScores = mutationParkings(popParkingsxScores)
         
-        popParkingsxScores.pop(-1)
-        popParkingsxScores.append(meilleurActuel)
-
         evolParkings[_] = meilleurActuel[0]
+        EvolScores[_] = meilleurActuel[1]
 
-        print(_,meilleurActuel[1],'\n')
-    
+    affichageEvolScore(EvolScores)
+    diagrammeDispersionScores(np.array(popParkingsxScores)[:,1])
     return evolParkings
+
+def test():
+    P = _parking_cool_test(LONGUEUR_PARKING,LARGEUR_PARKING)
+    simulation(P)
 
 if __name__ == '__main__':
     print("Ce programme n'est pas destiné à être lancé.")
