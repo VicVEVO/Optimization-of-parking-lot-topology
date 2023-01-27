@@ -9,13 +9,10 @@ from matplotlib import pyplot as plt
 import matplotlib.animation as animation
 
 def affichage(tab):
-    # on ne prend que les premiers indices pour l'afficher
     tab = np.array(tab,dtype=int)
 
-    # Initialisation fenetre
     fig, ax = plt.subplots(figsize=(0.2*LARGEUR_PARKING, 0.2*LARGEUR_PARKING))
 
-    # Dessin du tableau
     image = plt.imshow(tab, vmin=-1, vmax=2)
     
     ax = plt.gca()
@@ -26,12 +23,9 @@ def affichage(tab):
     plt.show()
 
 def affichageLoop(tab):
-    # Initialisation fenetre
     fig, ax = plt.subplots(figsize=(0.2*LARGEUR_PARKING, 0.2*LARGEUR_PARKING))
 
-    # Dessin du tableau
     image = plt.imshow(tab[0], vmin=-1, vmax=2)
-    # Animation
     ani = animation.FuncAnimation(fig, updateAni, frames = tab.shape[0], interval = int(1000*5/tab.shape[0]), fargs=(tab, image), repeat = True)
 
     ax = plt.gca()
@@ -42,11 +36,31 @@ def affichageLoop(tab):
     plt.show()
 
 def updateAni(i, tab, image):
-
-    image.set_data(tab[i]) #Mise à jour de l'image
+    
+    image.set_data(tab[i])
     
     return True
 
+def affichageEvolScore(scores):
+
+    abscisses = np.arange(N_GENERATIONS)
+    plt.plot(abscisses,scores)
+    plt.show()
+
+def diagrammeDispersionScores(scores):
+
+    precision = abs(int(np.floor(np.log10(abs((np.max(scores) - np.min(scores))/100)))))
+    for i in range(len(scores)):
+        scores[i] = np.around(scores[i],precision)
+    print('Scores:',scores)
+    occurrences, scoresUniques = np.unique(scores, return_counts=True)
+    
+    plt.bar(occurrences,scoresUniques)
+    plt.xlabel('Scores')
+    plt.ylabel('Nombre d\'occurrences')
+    plt.show()
+    
+    
 if __name__ == '__main__':
     print("Ce programme n'est pas destiné à être lancé.")
     
