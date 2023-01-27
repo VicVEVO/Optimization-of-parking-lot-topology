@@ -1,10 +1,9 @@
 from constantes import *
 
 import numpy as np
-from random import randint
+from random import randint, random
 
-
-def dijkstra(parking, i1, j1, i2, j2, volOiseau=False): # faire A* pour comparer si bcp utilisée
+def dijkstra(parking, i1, j1, i2, j2, volOiseau=False): # faire A*
     """
     Algorithme cherchant avec la méthode de Dijkstra un chemin liant deux points (i1,j1) et (i2,j2) dans arr
     Parameters
@@ -35,9 +34,8 @@ def dijkstra(parking, i1, j1, i2, j2, volOiseau=False): # faire A* pour comparer
         for numVoisin in range(len(voisinage)):
 
             iVois, jVois = voisinage[numVoisin]
-
             if 0 <= iVois < LONGUEUR_PARKING and 0 <= jVois < LARGEUR_PARKING and not indicesVisités[iVois, jVois]: # si la case est pas visitée est qu'il n'y a pas de OOB
-                if parking[iVois,jVois] == 0 or volOiseau: # si la case est accessible physiquement et que c'est de la route
+                if parking[iVois,jVois] == 0 or volOiseau or (iVois,jVois) == (i2,j2): # si la case est accessible physiquement et que c'est de la route
                     indicesVisités[iVois, jVois] = True # le voisin est désormais visité
                     queue.append((iVois, jVois)) # on l'ajoute parmi les prochains a devoir être visité
 
@@ -53,7 +51,7 @@ def dijkstra(parking, i1, j1, i2, j2, volOiseau=False): # faire A* pour comparer
 
     return list(reversed(chemin))
 
-def coordonneesRoutes(parking):
+def coordonneesRoutes(parking): # à improve
     iBal,jBal = I_ENTREE,J_ENTREE
     casesVisitees = []
 
@@ -155,7 +153,7 @@ def placesBordsRoute(parking): # à improve
             if 0<=iEntourant<=LARGEUR_PARKING-1 and J_ENTREE<=jEntourant<=J_SORTIE and (iEntourant,jEntourant) not in coordsPlaces and parking[iEntourant,jEntourant] == 1: # s'il y a une place accessible depuis la route
                 coordsPlaces.append((iEntourant,jEntourant))
 
-    return coordsPlaces
+    return np.array(coordsPlaces)
 
 def ajouteRoute(parking,i0,j0,i1,j1):
     
@@ -170,34 +168,53 @@ def ajouteRoute(parking,i0,j0,i1,j1):
         parking[iBal,jBal] = 0
         etape += 1
 
-def coordonneesPlaceProche(parking,i,j):
-    coordsPlaces = np.argwhere(parking==1)
-    distancescoordsPlaces = np.sqrt((coordsPlaces[:,0]-i)**2 + (coordsPlaces[:,1]-j)**2)
-    indiceMin = np.argmin(distancescoordsPlaces) # ne suffit pas: il faut que la voiture puisse y aller
-    return coordsPlaces[indiceMin]
+def coordonneesPlaceProche(parking,coordsPlacesAccess,i,j):
+    coordsPlacesDispos = np.array([(x,y) for x,y in coordsPlacesAccess if parking[x,y] != 2])
+    if not np.any(coordsPlacesDispos): # si toutes les places sont prises la voiture ne bouge pas
+        return (i,j)
+    distancescoordsPlacesDispos = np.sqrt((coordsPlacesDispos[:,0]-i)**2 + (coordsPlacesDispos[:,1]-j)**2)
+    indiceMin = np.argmin(distancescoordsPlacesDispos)
+    return coordsPlacesDispos[indiceMin]
 
 def refresh(parking,parkingRef,iPrec,jPrec,iSuiv,jSuiv):
     parking[iPrec,jPrec], parking[iSuiv,jSuiv] = parkingRef[iPrec,jPrec], 2
 
-def nvVoiture(voiture,parkingSim,parking,tMoyGarage,tMoySortie):
+def nvVoiture(voiture,parkingSim,parking,coordsPlacesAccess,tMoyGarage,tMoySortie):
     (i,j) = voiture[0]
     voitureGaree = voiture[1]
     if not voitureGaree:
         tMoyGarage += 1/NTOT_VOITURES
-        (iPlace,jPlace) = coordonneesPlaceProche(parkingSim,i,j)
+        (iPlace,jPlace) = coordonneesPlaceProche(parkingSim,coordsPlacesAccess,i,j)
         cheminPlace = dijkstra(parkingSim,i,j,iPlace,jPlace)
-        (iSuiv,jSuiv) = cheminPlace[0]
-        if (iSuiv,jSuiv) == (iPlace,jPlace):
-            voitureGaree = True
+        
+        if np.any(cheminPlace): # si la voiture peut
+            (iSuiv,jSuiv) = cheminPlace[0]
+            if (iSuiv,jSuiv) == (iPlace,jPlace):
+                voitureGaree = True
+        else:
+            (iSuiv,jSuiv) = (i,j)
 
     else:
         tMoySortie += 1/NTOT_VOITURES
-        cheminPlace = dijkstra(parkingSim,i,j,I_SORTIE,J_SORTIE)
-        (iSuiv,jSuiv) = cheminPlace[0]
-        
-        if (iSuiv,jSuiv) == (I_SORTIE,J_SORTIE):
-            refresh(parkingSim,parking,i,j,I_SORTIE,J_SORTIE)
-            return [], tMoyGarage, tMoySortie
+        if parking[i,j] == 1: # si la voiture est garée
+            voitureRepart = random()>PROBA_SORTIE_GARAGE
+        else:
+            voitureRepart = True
+        if voitureRepart:
+            cheminSortie = dijkstra(parkingSim,i,j,I_SORTIE,J_SORTIE)
+            if np.any(cheminSortie): # si la voiture peut sortir de sa place
+                (iSuiv,jSuiv) = cheminSortie[0]
+                
+                if (iSuiv,jSuiv) == (I_SORTIE,J_SORTIE):
+                    refresh(parkingSim,parking,i,j,I_SORTIE,J_SORTIE)
+                    return [], tMoyGarage, tMoySortie
+            else:
+                (iSuiv,jSuiv) = (i,j)
+        else:
+            (iSuiv,jSuiv) = (i,j)
 
     refresh(parkingSim,parking,i,j,iSuiv,jSuiv)
     return [(iSuiv,jSuiv),voitureGaree], tMoyGarage, tMoySortie
+
+if __name__ == '__main__':
+    print("Ce programme n'est pas destiné à être lancé.")
