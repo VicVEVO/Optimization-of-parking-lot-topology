@@ -8,6 +8,11 @@ from fonctions_techniques import *
 def main():
     evolParkings = evolutionGenetique()
     affichageLoop(evolParkings)
+    #test()
 
 if __name__ == '__main__':
     main()
+
+'''
+A améliorer: fonctions techniques: recursion depth et mettre A*
+'''
