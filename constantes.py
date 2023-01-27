@@ -3,8 +3,9 @@ Programme secondaire répertoriant les constantes.
 """
 
 I_TYPE_CASE = 0
-N_ITERATIONS = 100
-DUREE_GARAGE = 50 #s/iterations
+N_ITERATIONS = 50
+DUREE_MOY_GARAGE = 50 # /!\ si !=N_ITERATIONS le score peut changer pour un même parking
+PROBA_SORTIE_GARAGE = DUREE_MOY_GARAGE/N_ITERATIONS
 PROBA_MUTATION = 0.3
 PROBA_APPARITION_NV_ROUTE = 0.2 # pas utilisé
 LONGUEUR_PARKING = 10
@@ -18,7 +19,7 @@ NB_ROUTES_GEN = 1
 FREQUENCE_APPARITION = 3
 NTOT_VOITURES = N_ITERATIONS//FREQUENCE_APPARITION + 1 # nb total de voitures qui apparaîtront
 N_PARKINGS = 100
-N_GENERATIONS = 1000
+N_GENERATIONS = 100
 
 if __name__ == '__main__':
     print("Ce programme n'est pas destiné à être lancé.")
