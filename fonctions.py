@@ -55,13 +55,12 @@ def score(parking):
     - Doit ensuite privilégier une route avec bcp de places dispo (<=> on s'y gare vite)
     """
     coordsRoute = coordonneesRoutes(parking)
-    entreePasDansRoute = not np.any(coordsRoute)
-    
+    entreePasDansRoute = coordsRoute == set()
     if entreePasDansRoute:
         return 99999
 
     nbBlocsRoute = np.count_nonzero((parking == 0))
-    sortieDansRoute = np.any(np.all([I_SORTIE,J_SORTIE] == coordsRoute, axis=1))
+    sortieDansRoute = (I_SORTIE,J_SORTIE) in coordsRoute
 
     if sortieDansRoute:
         scoreDuree = simulation(parking)
@@ -134,14 +133,27 @@ def mutationBon(parking):
     """
     Si le parking est bon on modifie une des trajectoires de sa route principale.
     """
-    coordsRoute = coordonneesRoutes(parking)
+    coordsRoute = np.array(list(coordonneesRoutes(parking)))
     sensAllongement = ['haut','bas'][randint(0,1)]
-    (iCoup1,jCoup1) = coordsRoute[coordsRoute[:,1] >= randint(0,LARGEUR_PARKING-2)][0]
-    (iCoup2,jCoup2) = coordsRoute[coordsRoute[:,1] >= randint(jCoup1+1,LARGEUR_PARKING-1)][0] # on choisit d'autres coordonnées
-    (iCoup1,jCoup1) , (iCoup2,jCoup2) = coordonneesFrontiere(iCoup1,jCoup1,parking,sensAllongement) , coordonneesFrontiere(iCoup2,jCoup2,parking,sensAllongement)
+
+    (iCoup1,jCoup1), (iCoup2,jCoup2) = coordonneesCoupage(parking,coordsRoute,sensAllongement)
+    
     enleveRoute(parking,iCoup1,jCoup1,iCoup2,jCoup2,coordsRoute,sensAllongement)
     ajouteRoute(parking,iCoup1,jCoup1,iCoup2,jCoup2)
     return parking
+
+def mutationAjoutBoutRoute(parking):
+    coordsRoute = np.array(list(coordonneesRoutes(parking)))
+    nbBlocsRoute = len(coordsRoute) - 1
+    (iAjout,jAjout) = coordsRoute[randint(0,nbBlocsRoute)]
+    sensAjout = ['haut','bas','gauche','droite'][randint(0,3)] # on ajoute de la route en haut, en bas, à gauche ou à droite
+    (iAjout,jAjout) = coordonneesFrontiere(iAjout,jAjout,parking,sensAjout,'ajout_morceau_route')
+
+    if (iAjout,jAjout) != (I_ENTREE,J_ENTREE) and (iAjout,jAjout) != (I_SORTIE,J_SORTIE):
+        parking[iAjout,jAjout] = 0
+        
+    [iSuppr,jSuppr] = np.argwhere(parking == 0)
+    parking[iSuppr,jSuppr] = [-1,1][randint(0,1)]
 
 def mutationParkings(popParkingsxScore):
     for numParking in range(2,N_PARKINGS):
@@ -169,14 +181,20 @@ def evolutionGenetique():
         
         evolParkings[_] = meilleurActuel[0]
         EvolScores[_] = meilleurActuel[1]
+        print(meilleurActuel[1],_)
 
     affichageEvolScore(EvolScores)
     diagrammeDispersionScores(np.array(popParkingsxScores)[:,1])
     return evolParkings
 
 def test():
-    P = _parking_cool_test(LONGUEUR_PARKING,LARGEUR_PARKING)
-    simulation(P)
+    P = 1 + np.zeros((LARGEUR_PARKING,LONGUEUR_PARKING))
+    P[I_ENTREE] = 0
+    A = np.zeros((500,LARGEUR_PARKING,LONGUEUR_PARKING))
+    for i in range(500):
+        A[i] = P
+        mutationBon(P)
+    affichageLoop(A)
 
 if __name__ == '__main__':
     print("Ce programme n'est pas destiné à être lancé.")
