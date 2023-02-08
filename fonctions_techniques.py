@@ -51,7 +51,7 @@ def dijkstra(parking, i1, j1, i2, j2, volOiseau=False): # faire A*
 
     return list(reversed(chemin))
 
-def coordonneesRoutes(parking): # à improve
+def exCoordonneesRoutes(parking):
     iBal,jBal = I_ENTREE,J_ENTREE
     casesVisitees = []
 
@@ -63,10 +63,26 @@ def coordonneesRoutes(parking): # à improve
         if parking[iBal,jBal] !=0 or (iBal,jBal) in casesVisitees:
             return []
         casesVisitees.append((iBal,jBal))
-        return [(iBal,jBal)] + _parcours_profondeur(parking, iBal+1, jBal)+_parcours_profondeur(parking, iBal-1, jBal)+_parcours_profondeur(parking, iBal, jBal+1)+_parcours_profondeur(parking, iBal, jBal-1)
+        return [(iBal,jBal)] + _parcours_profondeur(parking, iBal+1, jBal) + _parcours_profondeur(parking, iBal-1, jBal)+_parcours_profondeur(parking, iBal, jBal+1) + _parcours_profondeur(parking, iBal, jBal-1)
 
     coordos = _parcours_profondeur(parking,iBal,jBal)
     return np.array(coordos)
+
+def coordonneesRoutes(parking):
+    iBal,jBal = I_ENTREE,J_ENTREE
+    casesVisitees = set()
+    fileCoordsAVisiter = [(iBal,jBal)]
+
+    while fileCoordsAVisiter:
+        iBal,jBal = fileCoordsAVisiter.pop(0)
+        if iBal < 0 or iBal >= LARGEUR_PARKING or jBal < J_ENTREE or jBal > J_SORTIE:
+            continue # on skip l'itération
+
+        if parking[iBal,jBal] !=0 or (iBal,jBal) in casesVisitees:
+            continue
+        casesVisitees.add((iBal,jBal))
+        fileCoordsAVisiter.extend([(iBal-1,jBal),(iBal+1,jBal),(iBal,jBal-1),(iBal,jBal+1)]) # plus efficace que +=
+    return casesVisitees # on travaille directement avec l'ensemble
 
 def coordonneesFrontiere(i,j,parking,sens,etape=''): # donne coords sur bordure (si etape='deviation' dans mutation) inf ou sup de la route principale 
     
@@ -135,25 +151,14 @@ def enleveRoute(parking,i0,j0,i1,j1,coordsRoute,sensAllongement):
                 parking[i,j0] = 1#[-1,1][randint(0,1)]
         for i in range(i1+1,LARGEUR_PARKING):
             if (i,j1) in coordsRoute:
-                parking[i,j0] = 1#[-1,1][randint(0,1)]
+                parking[i,j1] = 1#[-1,1][randint(0,1)]
     else:
         for i in range(i0-1,-1,-1):
             if (i,j0) in coordsRoute:
                 parking[i,j0] = 1#[-1,1][randint(0,1)]
         for i in range(i1-1,-1,-1):
             if (i,j1) in coordsRoute:
-                parking[i,j0] = 1#[-1,1][randint(0,1)]
-
-def placesBordsRoute(parking): # à improve
-    coordsPlaces = []
-    
-    for (iBal,jBal) in coordonneesRoutes(parking): # indices de balayage
-        coordonnes_entourant = [(iBal+1,jBal),(iBal,jBal+1),(iBal-1,jBal),(iBal,jBal-1)]
-        for (iEntourant,jEntourant) in coordonnes_entourant:
-            if 0<=iEntourant<=LARGEUR_PARKING-1 and J_ENTREE<=jEntourant<=J_SORTIE and (iEntourant,jEntourant) not in coordsPlaces and parking[iEntourant,jEntourant] == 1: # s'il y a une place accessible depuis la route
-                coordsPlaces.append((iEntourant,jEntourant))
-
-    return np.array(coordsPlaces)
+                parking[i,j1] = 1#[-1,1][randint(0,1)]
 
 def ajouteRoute(parking,i0,j0,i1,j1):
     
@@ -167,6 +172,36 @@ def ajouteRoute(parking,i0,j0,i1,j1):
         (iBal,jBal) = chemin[etape]
         parking[iBal,jBal] = 0
         etape += 1
+
+def coordonneesCoupage(parking,coordsRoute,sensAllongement):
+    couplesCoup1 = coordsRoute[(coordsRoute[:,1] >= randint(0,int(2/3*LONGUEUR_PARKING))) & (coordsRoute[:,1] <= 2/3*LONGUEUR_PARKING)]
+    nbCouplesCoup1 = len(couplesCoup1)
+    if nbCouplesCoup1 == 1:
+        (iCoup1,jCoup1) = couplesCoup1[0]
+    else:
+        (iCoup1,jCoup1) = couplesCoup1[randint(0,nbCouplesCoup1-1)]
+    
+    # on choisit d'autres coordonnées
+    
+    couplesCoup2 = coordsRoute[coordsRoute[:,1] >= randint(jCoup1+1,LONGUEUR_PARKING-2)]
+    nbCouplesCoup2 = len(couplesCoup2)
+    if nbCouplesCoup2 == 1:
+        (iCoup2,jCoup2) = couplesCoup2[0]
+    else:
+        (iCoup2,jCoup2) = couplesCoup2[randint(0,nbCouplesCoup2-1)]
+    
+    return coordonneesFrontiere(iCoup1,jCoup1,parking,sensAllongement), coordonneesFrontiere(iCoup2,jCoup2,parking,sensAllongement)
+
+def placesBordsRoute(parking): # à improve
+    coordsPlaces = []
+    
+    for (iBal,jBal) in coordonneesRoutes(parking): # indices de balayage
+        coordonnes_entourant = [(iBal+1,jBal),(iBal,jBal+1),(iBal-1,jBal),(iBal,jBal-1)]
+        for (iEntourant,jEntourant) in coordonnes_entourant:
+            if 0<=iEntourant<=LARGEUR_PARKING-1 and J_ENTREE<=jEntourant<=J_SORTIE and (iEntourant,jEntourant) not in coordsPlaces and parking[iEntourant,jEntourant] == 1: # s'il y a une place accessible depuis la route
+                coordsPlaces.append((iEntourant,jEntourant))
+
+    return np.array(coordsPlaces)
 
 def coordonneesPlaceProche(parking,coordsPlacesAccess,i,j):
     coordsPlacesDispos = np.array([(x,y) for x,y in coordsPlacesAccess if parking[x,y] != 2])
