@@ -3,72 +3,63 @@ from constantes import *
 import numpy as np
 from random import randint, random
 
-def dijkstra(parking, i1, j1, i2, j2, volOiseau=False): # faire A*
+def rechercheCheminMin(parking,i1, j1, i2, j2, volOiseau=False):#ok
     """
-    Algorithme cherchant avec la méthode de Dijkstra un chemin liant deux points (i1,j1) et (i2,j2) dans arr
+    Algorithme cherchant avec la méthode A* le chemin le plus court liant (i1,j1) et (i2,j2)
     Parameters
     ----------
     parking: array
-    i1: int
-    j1: int
-    i2: int
-    j2: int
+    i1, j1, i2, j2: int
+    volOiseau: bool
 
     Returns
     -------
     array
         liste des coordonnées successives des points du chemin liant (i1,j1) et (i2,j2).
     """
-    indicesVisités = np.full((LARGEUR_PARKING,LONGUEUR_PARKING), False)
-    queue = [(i1, j1)] # queue pour garder les indices que l'on doit visiter
-    indPrecedents = {} # dico pour garder les indices précédemment étudiés pour chaque indice
-    indicesVisités[i1, j1] = True
+    def heuristique(i,j):
+        return abs(j-j2) + abs(i-i2)
+    
+    D = np.full((LARGEUR_PARKING,LONGUEUR_PARKING), False)
+    V = [(i,j) for i in range(LARGEUR_PARKING) for j in range(LONGUEUR_PARKING)]
+    P = {}
+    C = {}
 
-    while queue: # tant qu'il y a des indices à étudier
-        i, j = queue.pop(0) # on prend le prochain indice dans la queue
-        if i == i2 and j == j2: # si l'indice actuel est arrivé sur l'indice de destination on arrête le programme
+    C = {(i, j): float('inf') for i in range(LARGEUR_PARKING) for j in range(LONGUEUR_PARKING)}
+    C[(i1, j1)] = 0
+
+    while V:
+        minValue,minCoords = float('inf'),None
+        for i,j in C.keys():
+            if C[i,j] <= minValue and (i,j) in V:
+                minValue,minCoords = C[i,j],(i,j)
+
+        (i,j) = V.pop(V.index((minCoords[0],minCoords[1]))) # on prend le prochain indice dans la queue
+        D[i,j] = True
+        if i == i2 and j == j2: # si l'indice actuel est arrivé sur l'indice de destination on arrête
             break
-
-        voisinage = [(i, j+1), (i-1, j), (i, j-1), (i+1, j)] # devant, gauche, derrière, droite
+        
+        voisinage = [(i, j+1), (i-1, j), (i, j-1), (i+1, j)]
 
         for numVoisin in range(len(voisinage)):
 
             iVois, jVois = voisinage[numVoisin]
-            if 0 <= iVois < LONGUEUR_PARKING and 0 <= jVois < LARGEUR_PARKING and not indicesVisités[iVois, jVois]: # si la case est pas visitée est qu'il n'y a pas de OOB
+            if 0 <= iVois < LARGEUR_PARKING and 0 <= jVois < LONGUEUR_PARKING and not D[iVois, jVois]: # si la case n'est pas visitée
                 if parking[iVois,jVois] == 0 or volOiseau or (iVois,jVois) == (i2,j2): # si la case est accessible physiquement et que c'est de la route
-                    indicesVisités[iVois, jVois] = True # le voisin est désormais visité
-                    queue.append((iVois, jVois)) # on l'ajoute parmi les prochains a devoir être visité
-
-                    indPrecedents[(iVois, jVois)] = (i, j) # on garde les indices précédents pour i_vois,j_vois
-                accessible = False
+                    D[iVois, jVois] = True # le voisin est désormais visité
+                    C[iVois, jVois] = C[i,j] + 1 + heuristique(iVois,jVois)
+                    P[(iVois, jVois)] = (i, j) # on stocke les indices précédents pour i_vois,j_vois
 
     chemin = []
 
     i, j = i2, j2 # on part de l'arrivée
-    while (i, j) in indPrecedents:
+    while (i, j) in P:
         chemin.append((i, j))
-        i, j = indPrecedents[(i, j)]
+        i, j = P[(i, j)]
 
     return list(reversed(chemin))
 
-def exCoordonneesRoutes(parking):
-    iBal,jBal = I_ENTREE,J_ENTREE
-    casesVisitees = []
-
-    def _parcours_profondeur(parking,iBal,jBal):
-        nonlocal casesVisitees # pour acceder à la variable cases_visitees
-        if iBal < 0 or iBal >= LARGEUR_PARKING or jBal < J_ENTREE or jBal > J_SORTIE:
-            return []
-
-        if parking[iBal,jBal] !=0 or (iBal,jBal) in casesVisitees:
-            return []
-        casesVisitees.append((iBal,jBal))
-        return [(iBal,jBal)] + _parcours_profondeur(parking, iBal+1, jBal) + _parcours_profondeur(parking, iBal-1, jBal)+_parcours_profondeur(parking, iBal, jBal+1) + _parcours_profondeur(parking, iBal, jBal-1)
-
-    coordos = _parcours_profondeur(parking,iBal,jBal)
-    return np.array(coordos)
-
-def coordonneesRoutes(parking):
+def coordonneesRoutes(parking): #ok
     iBal,jBal = I_ENTREE,J_ENTREE
     casesVisitees = set()
     fileCoordsAVisiter = [(iBal,jBal)]
@@ -85,7 +76,6 @@ def coordonneesRoutes(parking):
     return casesVisitees # on travaille directement avec l'ensemble
 
 def coordonneesFrontiere(i,j,parking,sens,etape=''): # donne coords sur bordure (si etape='deviation' dans mutation) inf ou sup de la route principale 
-    
     epsi = 1
     if etape == 'ajout_morceau_route': # astuce pour éviter de faire 2 fonctions
         epsi = 0 # Si on cherche à ajouter un bout de route, la coordonnée extérieure nous intéresse
@@ -164,11 +154,11 @@ def ajouteRoute(parking,i0,j0,i1,j1):
     
     (iDev, jDev) = coordonneesDerivation(i0,j0,i1,j1)
     
-    chemin = [(i0,j0)] + dijkstra(parking,i0,j0,iDev,jDev,True) + dijkstra(parking,iDev,jDev,i1,j1,True)
+    chemin = [(i0,j0)] + rechercheCheminMin(parking,i0,j0,iDev,jDev,True) + rechercheCheminMin(parking,iDev,jDev,i1,j1,True)
     etape = 0
-    nbEtapes = len(chemin) # chemin = np.concatenate((chemin1, chemin2))
+    nbEtapes = len(chemin)
 
-    while etape != nbEtapes: # parking[chemin[:,0],chemin[:,1]] = 0
+    while etape != nbEtapes:
         (iBal,jBal) = chemin[etape]
         parking[iBal,jBal] = 0
         etape += 1
@@ -192,35 +182,35 @@ def coordonneesCoupage(parking,coordsRoute,sensAllongement):
     
     return coordonneesFrontiere(iCoup1,jCoup1,parking,sensAllongement), coordonneesFrontiere(iCoup2,jCoup2,parking,sensAllongement)
 
-def placesBordsRoute(parking): # à improve
-    coordsPlaces = []
+def placesBordsRoute(parking): #ok
+    coordsPlaces = set()
     
     for (iBal,jBal) in coordonneesRoutes(parking): # indices de balayage
         coordonnes_entourant = [(iBal+1,jBal),(iBal,jBal+1),(iBal-1,jBal),(iBal,jBal-1)]
         for (iEntourant,jEntourant) in coordonnes_entourant:
-            if 0<=iEntourant<=LARGEUR_PARKING-1 and J_ENTREE<=jEntourant<=J_SORTIE and (iEntourant,jEntourant) not in coordsPlaces and parking[iEntourant,jEntourant] == 1: # s'il y a une place accessible depuis la route
-                coordsPlaces.append((iEntourant,jEntourant))
+            if 0<=iEntourant<=LARGEUR_PARKING-1 and J_ENTREE<=jEntourant<=J_SORTIE and parking[iEntourant,jEntourant] == 1: # s'il y a une place accessible depuis la route
+                coordsPlaces.add((iEntourant,jEntourant))
 
-    return np.array(coordsPlaces)
+    return np.array(list(coordsPlaces))
 
-def coordonneesPlaceProche(parking,coordsPlacesAccess,i,j):
-    coordsPlacesDispos = np.array([(x,y) for x,y in coordsPlacesAccess if parking[x,y] != 2])
+def coordonneesPlaceProche(parking,coordsPlacesAccess,i,j): #ok
+    coordsPlacesDispos = np.array([(x,y) for x,y in coordsPlacesAccess if parking[x,y] != 2]) # on prend les places accessibles libres (où il n'y a pas de voiture garée)
     if not np.any(coordsPlacesDispos): # si toutes les places sont prises la voiture ne bouge pas
         return (i,j)
     distancescoordsPlacesDispos = np.sqrt((coordsPlacesDispos[:,0]-i)**2 + (coordsPlacesDispos[:,1]-j)**2)
     indiceMin = np.argmin(distancescoordsPlacesDispos)
     return coordsPlacesDispos[indiceMin]
 
-def refresh(parking,parkingRef,iPrec,jPrec,iSuiv,jSuiv):
+def refresh(parking,parkingRef,iPrec,jPrec,iSuiv,jSuiv): #ok
     parking[iPrec,jPrec], parking[iSuiv,jSuiv] = parkingRef[iPrec,jPrec], 2
 
-def nvVoiture(voiture,parkingSim,parking,coordsPlacesAccess,tMoyGarage,tMoySortie):
+def nvVoiture(voiture,parkingSim,parking,coordsPlacesAccess,tMoyGarage,tMoySortie): #ok
     (i,j) = voiture[0]
     voitureGaree = voiture[1]
     if not voitureGaree:
         tMoyGarage += 1/NTOT_VOITURES
         (iPlace,jPlace) = coordonneesPlaceProche(parkingSim,coordsPlacesAccess,i,j)
-        cheminPlace = dijkstra(parkingSim,i,j,iPlace,jPlace)
+        cheminPlace = rechercheCheminMin(parkingSim,i,j,iPlace,jPlace)
         
         if np.any(cheminPlace): # si la voiture peut
             (iSuiv,jSuiv) = cheminPlace[0]
@@ -236,7 +226,7 @@ def nvVoiture(voiture,parkingSim,parking,coordsPlacesAccess,tMoyGarage,tMoySorti
         else:
             voitureRepart = True
         if voitureRepart:
-            cheminSortie = dijkstra(parkingSim,i,j,I_SORTIE,J_SORTIE)
+            cheminSortie = rechercheCheminMin(parkingSim,i,j,I_SORTIE,J_SORTIE)
             if np.any(cheminSortie): # si la voiture peut sortir de sa place
                 (iSuiv,jSuiv) = cheminSortie[0]
                 
