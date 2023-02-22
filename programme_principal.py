@@ -8,11 +8,14 @@ from fonctions_techniques import *
 def main():
     evolParkings = evolutionGenetique()
     affichageLoop(evolParkings)
-    #test()
+    #testMutation()
+    #testSim()
 
 if __name__ == '__main__':
     main()
 
 '''
-A améliorer: fonctions techniques: recursion depth et mettre A*
+Idées à tester: Algo génétique progressif (N_itérations augmente au fur et à mesure)
+                Faire stopper la simulation dès qu'aucune voiture ne peut bouger >> faster
+Problèmes: croisement inutile
 '''
