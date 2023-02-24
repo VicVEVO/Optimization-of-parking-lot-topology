@@ -6,4 +6,4 @@ Algorithme génétique à mémoire pour optimiser la configuration des parkings.
   - À un point de coupure
   - À 2 points de coupure (actuel)
 
-À voir: parallèlisation de calculs pour algo à co-adaptation.
+À voir: parallèlisation de calculs pour algo à co-adaptation?
