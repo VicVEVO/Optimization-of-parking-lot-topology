@@ -194,7 +194,7 @@ def coordonneesCoupage(parking,coordsRoute,sensAllongement):
     Fonction renvoyant 2 couples de coordonnées aléatoires sur la route à partir
     desquelles la route qui les a rejoint sera déviée
     """
-    couplesCoup1 = coordsRoute[(coordsRoute[:,1] >= randint(0,int(2/3*LONGUEUR_PARKING))) & (coordsRoute[:,1] <= 2/3*LONGUEUR_PARKING)]pSCORE_MAUVAIS
+    couplesCoup1 = coordsRoute[(coordsRoute[:,1] >= randint(0,int(2/3*LONGUEUR_PARKING))) & (coordsRoute[:,1] <= 2/3*LONGUEUR_PARKING)]
     nbCouplesCoup1 = len(couplesCoup1)
     if nbCouplesCoup1 == 1:
         (iCoup1,jCoup1) = couplesCoup1[0]
