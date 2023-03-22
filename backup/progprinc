@@ -6,28 +6,62 @@ from fonctions_techniques import *
 ## Début du programme
 
 def main():
-    evolParkings = evolutionGenetique()
-    for p in evolParkings:
-        affichage(p)
+
+    evolParkings,derniereGenxScores = evolutionGenetique()
+    save_to_file(evolParkings, "parkings_derniere_gen")
+    save_to_file(derniereGenxScores, "scores_derniere_gen")
+
+    occ = count_parkings(derniereGenxScores)
+    for i in occ.keys():
+        print(occ[i])
+
+    evolDerniereGen = np.zeros((N_PARKINGS,LARGEUR_PARKING,LONGUEUR_PARKING))
+    for i in range(N_PARKINGS):
+        evolDerniereGen[i] = derniereGenxScores[i][0]
+    affichageLoop(evolDerniereGen)
+
     affichageLoop(evolParkings)
-    #testMutation()
-    #testSim()
+
 
 if __name__ == '__main__':
     main()
 
 '''
+En fait le pb de stagnation c'est pas l'algo génétique mais le fait qu'une entrée et une sortie.
+Si on a plusieurs entrées et plusieurs sorties on aura ça se trouve qqch de bien.
+Pour 1 entrée et 1 sortie: impression stagnation optimum local car flux constant!!!
+
+>> Conseil Mr Léger: dès que stagne, remplacer 3/4 des parkings de façon random && garder minimum local (maybe niquel)
+
+A faire ajd:
+- modif programme diff entrées et sorties (d'abord diff sorties)
+- Comment simuler? Voitures restent garées jusqu'à quand?
+    Si random: résultats peuvent varier selon algos lancés: interessant: même limite?
+    Sinon: Varie en fct du score? Random?
+
+    Score dépend durée garage + durée sortie
+
+>> faire simulation avec algo gen random
+
 
 Idées à tester:
-- Algo génétique progressif (N_itérations augmente au fur et à mesure)
-- Faire stopper la simulation dès qu'aucune voiture ne peut bouger >> faster
+>> algo génétique progressif ?
+- Si stagnation, lancer plusieurs algo génétiques en même temps >> intervertir parkings entre eux
+- score nb connections entre places de parkings (évite places random)
 
-Problèmes:
+Problèmes (on ignore sagement):
 - Les parkings sont multipliés: ils se ressemblent tous: limite évolution
 - Croisement inutile
 
-A faire:
+A faire (on s'en fout aussi):
+- Ajouter chance mutation aléa pour chacun des enfants >> diversité génétique
+- Ajout autres croisements: 1 case/2, en 1 pt
+- Ajout autres mutations: mutation avec plusieurs mutations de bloc de route
+- Essayer score différent qui peut mieux capturer la diversité des parkings (ex. en utilisant la densité de la population de parkings dans certaines zones, ou la longueur totale de la route de chaque parking)
+
+But actuel:
 - Tester algo génétique avec différents scores >> différents parkings puis comparer
 parkings avec score A* long >> voir meilleure méthode
+- Faire varier tous les paramètres à la fin >> voir affectation
 
 '''
