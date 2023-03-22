@@ -1,3 +1,3 @@
 # TIPE_2023
 
-~~LE FUN YOUHOU~~
+_ Bienvenue _ pour du ~~mega~~ fun. 
