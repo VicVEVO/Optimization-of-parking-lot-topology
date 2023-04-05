@@ -54,6 +54,8 @@ def rechercheCheminMin(parking,i1, j1, i2, j2, volOiseau=True,justeProchCoord=Fa
                         P[(iVois, jVois)] = (i, j) # on stocke les indices précédents pour i_vois,j_vois
 
     if not balFini or P == {}: # si les 2 points ne sont pas joignables
+        if justeProchCoord:
+            return (i1,j1)
         return [(i1,j1)]
     
     ### On renvoie la liste des coordonnées dans l'ordre en partant de l'arrivée
@@ -65,7 +67,9 @@ def rechercheCheminMin(parking,i1, j1, i2, j2, volOiseau=True,justeProchCoord=Fa
         i, j = P[(i, j)]
 
     if justeProchCoord:
-        return chemin[-1]
+        if chemin:
+            return chemin[-1]
+        return (i1,j1)
     return list(reversed(chemin))
 
 def coordonneesRoutes(parking):
@@ -275,6 +279,16 @@ def coordonneesPlaceProche(parking,coordsPlacesAccess,i,j):
     indiceMin = np.argmin(distancescoordsPlacesLibres)
     return coordsPlacesLibres[indiceMin]
 
+def coordonneesSortieProche(parking,i,j):
+    """
+    Fonction renvoyant les coordonnées de la sortie la plus proche de (i,j) selon
+    la norme 1 (distance de Manhattan)
+    """
+    coordsSorties = np.array(list(COORDS_SORTIES))
+    distancescoordsPlacesLibres = abs(coordsSorties[:,0]-i) + abs(coordsSorties[:,1]-j)
+    indiceMin = np.argmin(distancescoordsPlacesLibres)
+    return coordsSorties[indiceMin]
+
 def refresh(parking,parkingRef,iPrec,jPrec,iSuiv,jSuiv):
     parking[iPrec,jPrec], parking[iSuiv,jSuiv] = parkingRef[iPrec,jPrec], NUM_VOITURE
 
@@ -293,16 +307,17 @@ def nvVoiture(voiture,parkingSim,parking,coordsPlacesAccess,tMoyGarage,tMoySorti
             voitureEnSortie = True
 
     else:
-        tMoySortie += 1/NTOT_VOITURES
         if parking[i,j] == NUM_PLACE:
             voitureRepart = random()>PROBA_SORTIE_GARAGE
         else:
             voitureRepart = True
         if voitureRepart:
-            (iSuiv,jSuiv) = rechercheCheminMin(parkingSim,i,j,I_SORTIE,J_SORTIE,False,True) # trouver sortie la + proche
+            tMoySortie += 1/NTOT_VOITURES
+            iSortie,jSortie = coordonneesSortieProche(parking,i,j)
+            (iSuiv,jSuiv) = rechercheCheminMin(parkingSim,i,j,iSortie,jSortie,False,True)
             
-            if (iSuiv,jSuiv) == (I_SORTIE,J_SORTIE): # ducoup mettre == iSortie,jSortie pour sortie trouvee
-                refresh(parkingSim,parking,i,j,I_SORTIE,J_SORTIE)
+            if (iSuiv,jSuiv) == (iSortie,jSortie):
+                refresh(parkingSim,parking,i,j,iSortie,jSortie)
                 return [], tMoyGarage, tMoySortie
         else:
             (iSuiv,jSuiv) = (i,j)
@@ -340,13 +355,14 @@ def nvVoitureRandom(voiture,parkingSim,parking,tMoyGarage,tMoySortie):
             voitureEnSortie = True
         
     else:
-        tMoySortie += 1/NTOT_VOITURES
+        
         if parking[i,j] == NUM_PLACE:
             voitureRepart = random()>PROBA_SORTIE_GARAGE
         else:
             voitureRepart = True
 
         if voitureRepart:
+            tMoySortie += 1/NTOT_VOITURES
             coordsRoutesProches = []
 
             for (iVois,jVois) in [(i, j+1), (i-1, j), (i, j-1), (i+1, j)]:
@@ -379,28 +395,11 @@ def count_parkings(parkings):
         occurences[key] = occurences.get(key, 0) + 1
     return occurences
 
-def save_to_file(liste, filename):
+def saveData(popParkings,name):
+    np.savetxt(name,popParkings,delimiter=',')
 
-    file = open(filename, 'w')
-
-    for parking in liste:
-        np.savetxt(file, parking[0])
-        file.write(str(parking[1]) + '\n')
-    file.close()
-
-def load_parkings_from_file(filename):
-    file = open(filename, 'r')
-    parkings = []
-
-    while True:
-        arr = np.loadtxt(file)
-        if arr.size == 0:
-            break
-        score = float(file.readline())
-        parkings.append((arr, score))
-        
-    file.close()
-    return parkings
+def openData(name):
+    return np.loadtxt(name,delimiter=',')
 
 if __name__ == '__main__':
     print("Ce programme n'est pas destiné à être lancé.")
