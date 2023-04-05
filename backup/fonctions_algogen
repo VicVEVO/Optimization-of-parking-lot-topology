@@ -29,7 +29,6 @@ def periodeArriveeVoitures(score):
     return a_T*abs(score) + b_T
 
 def scoreSimulationFinale(parking):
-    evolParkings = np.zeros((N_ITERATIONS,LARGEUR_PARKING+2,LONGUEUR_PARKING))
     #evolParkings = np.zeros((N_ITERATIONS,LARGEUR_PARKING,LONGUEUR_PARKING))
     voitures = []
     parkingSim = deepcopy(parking)
@@ -45,12 +44,12 @@ def scoreSimulationFinale(parking):
             if voitures[numVoiture]: # si la voiture n'est pas arrivée
                 voitures[numVoiture], tMoyGarage, tMoySortie = nvVoiture(voitures[numVoiture],parkingSim,parking,coordsPlacesAccess,tMoyGarage,tMoySortie)
                 
-        evolParkings[k] = parkingSim
-    affichageLoop(evolParkings)
-    return tMoyGarage,tMoySortie
+        #evolParkings[k] = parkingSim
+    #affichageLoop(evolParkings)
+    return COEFF_MISE_A_NIVEAU_SCORES_SIMFINALE/(tMoyGarage+tMoySortie)
 
 def scoreSimulationAleatoire(parking):
-    #evolParkings = np.zeros((N_ITERATIONS,LARGEUR_PARKING+2,LONGUEUR_PARKING))
+    #evolParkings = np.zeros((N_ITERATIONS,LARGEUR_PARKING,LONGUEUR_PARKING))
 
     voitures = []
     parkingSim = deepcopy(parking)
@@ -66,11 +65,11 @@ def scoreSimulationAleatoire(parking):
                 voitures[numVoiture], tMoyGarage, tMoySortie = nvVoitureRandom(voitures[numVoiture],parkingSim,parking,tMoyGarage,tMoySortie)
                 
         #evolParkings[k] = parkingSim
-        #affichage(parkingSim)
-    #affichageLoop(evolParkings)
-    return -10/(tMoyGarage+tMoySortie)
 
-def score(parking):
+    #affichageLoop(evolParkings)
+    return COEFF_MISE_A_NIVEAU_SCORES_SIMALEA/(tMoyGarage+tMoySortie)
+
+def score(parking,key = ''):
     """
     Critère de notation d'un parking défini en 2 parties:
     Si parking n'est pas linéaire, on privilégie la taille de la route principale
@@ -89,11 +88,13 @@ def score(parking):
             if (iSortie,jSortie) in coordsRoute[cheminRoute]:
                 parkingLineaire = True
     
-
     if parkingLineaire:
-        #return scoreSimulationAleatoire(parking)
-        #affichage(parking)
-        return scoreNombrePlaces(parking)
+        if key == 'simFinale':
+            return scoreSimulationFinale(parking)
+        elif key == 'simAlea':
+            return scoreSimulationAleatoire(parking)
+        else:
+            return scoreNombrePlaces(parking)
     return scoreTailleRoute(parking,coordsRoute)
 
 ### Fonctions de croisement
@@ -133,7 +134,7 @@ def croisementRoutes(P1,scoreP1,P2,scoreP2):
 
 ### Fonctions de mutation
 
-def mutationRandom(parking):
+def mutationRandom(parking,probaMut):
     """
     Fonction de mutation aléatoire d'un parking, c'est-à-dire en modifiant
     aléatoirement chacune de ses composantes
@@ -141,7 +142,7 @@ def mutationRandom(parking):
     for i in range(LARGEUR_PARKING):
         for j in range(LONGUEUR_PARKING):
             if (i,j) not in COORDS_ENTREES and (i,j) not in COORDS_SORTIES:
-                if random()<PROBA_RANDOM_MUT:
+                if random()<probaMut:
                     parking[i,j] = [NUM_MUR,NUM_ROUTE,NUM_PLACE][randint(0,2)]
                     
 def mutationDeviation(parking):
