@@ -96,14 +96,14 @@ def evolutionGenetique():
         t2 = time()
         print(meilleurActuel[1],'//',np.round(t2-t1,1),'//',_)
 
-    #affichageEvolScore(np.array(evolScores))
-    #diagrammeDispersionScores(np.array(popParkingsxScores)[:,1])
+    affichageEvolScore(np.array(evolScores))
+    diagrammeDispersionScores(np.array(popParkingsxScores)[:,1])
     
     return evolParkings,popParkingsxScores
 
 if __name__ == '__main__':
-    p1 = _parking_cool_test(LONGUEUR_PARKING,LARGEUR_PARKING)
-    affichage(p1)
-    print(score(p1))
+    #p1 = _parking_cool_test(LONGUEUR_PARKING,LARGEUR_PARKING)
+    #affichage(p1)
+    #print(score(p1,'simFinale'))
     
-    #print("Ce programme n'est pas destiné à être lancé.")
+    print("Ce programme n'est pas destiné à être lancé.")
