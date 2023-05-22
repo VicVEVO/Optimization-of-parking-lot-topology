@@ -6,18 +6,21 @@ from fonctions_techniques import *
 ## Début du programme
 
 def main():
-
+    #p = _parking_cool_test(LONGUEUR_PARKING,LARGEUR_PARKING)
+    #affichage(p)
+    
     evolParkings,derniereGenxScores = evolutionGenetique()
     saveData(evolParkings[0], "parkingsDerniereGenScore_{score}.csv".format(score=derniereGenxScores[0][1]))
     
-    '''
+    
     evolDerniereGen = np.zeros((N_PARKINGS,LARGEUR_PARKING,LONGUEUR_PARKING))
     for i in range(N_PARKINGS):
         evolDerniereGen[i] = derniereGenxScores[i][0]
-    '''
-    affichageLoop(evolDerniereGen)
 
-    affichageLoop(evolParkings)
+    #affichageLoop(evolDerniereGen)
+    #affichageLoop(evolParkings)
+
+    # stop programme dès que parkings liés pour mesurer nb itérations >>  10 000 >> moyenne + écart-type + ??
 
 
 if __name__ == '__main__':
@@ -26,7 +29,7 @@ if __name__ == '__main__':
 '''
 
 >> Conseil: dès que stagne, remplacer 3/4 des parkings de façon random && garder minimum local (maybe niquel)
->> Changer mettre np.save pour open et tout :)
+>> Bizarre: vérif qd nuree_moy_garage != n_iteration
 
 Idées à tester:
 >> algo génétique progressif ?
