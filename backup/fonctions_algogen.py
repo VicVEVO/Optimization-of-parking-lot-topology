@@ -17,7 +17,7 @@ def scoreNombrePlaces(parking):
     placesAcc = placesBordsRoute(parking)
     for (i,j) in placesAcc:
         nbPlacesAccessibles += len(placesAcc[i,j])
-    return 1 - nbPlacesAccessibles
+    return SCORE_SEUIL - nbPlacesAccessibles
 
 def scoreTailleRoute(parking,coordsRoute):
     tailleRoute = 0
@@ -29,7 +29,7 @@ def periodeArriveeVoitures(score):
     return a_T*abs(score) + b_T
 
 def scoreSimulationFinale(parking):
-    #evolParkings = np.zeros((N_ITERATIONS,LARGEUR_PARKING,LONGUEUR_PARKING))
+    evolParkings = np.zeros((N_ITERATIONS,LARGEUR_PARKING,LONGUEUR_PARKING))
     voitures = []
     parkingSim = deepcopy(parking)
     coordsPlacesAccess = placesBordsRoute(parking)
@@ -44,12 +44,12 @@ def scoreSimulationFinale(parking):
             if voitures[numVoiture]: # si la voiture n'est pas arrivée
                 voitures[numVoiture], tMoyGarage, tMoySortie = nvVoiture(voitures[numVoiture],parkingSim,parking,coordsPlacesAccess,tMoyGarage,tMoySortie)
                 
-        #evolParkings[k] = parkingSim
-    #affichageLoop(evolParkings)
+        evolParkings[k] = parkingSim
+    affichageLoop(evolParkings)
     return COEFF_MISE_A_NIVEAU_SCORES_SIMFINALE/(tMoyGarage+tMoySortie)
 
 def scoreSimulationAleatoire(parking):
-    #evolParkings = np.zeros((N_ITERATIONS,LARGEUR_PARKING,LONGUEUR_PARKING))
+    evolParkings = np.zeros((N_ITERATIONS,LARGEUR_PARKING,LONGUEUR_PARKING))
 
     voitures = []
     parkingSim = deepcopy(parking)
@@ -64,12 +64,12 @@ def scoreSimulationAleatoire(parking):
             if voitures[numVoiture]: # si la voiture n'est pas arrivée
                 voitures[numVoiture], tMoyGarage, tMoySortie = nvVoitureRandom(voitures[numVoiture],parkingSim,parking,tMoyGarage,tMoySortie)
                 
-        #evolParkings[k] = parkingSim
+        evolParkings[k] = parkingSim
 
-    #affichageLoop(evolParkings)
+    affichageLoop(evolParkings)
     return COEFF_MISE_A_NIVEAU_SCORES_SIMALEA/(tMoyGarage+tMoySortie)
 
-def score(parking,key = ''):
+def score(parking,typeSimulation = ''):
     """
     Critère de notation d'un parking défini en 2 parties:
     Si parking n'est pas linéaire, on privilégie la taille de la route principale
@@ -89,9 +89,9 @@ def score(parking,key = ''):
                 parkingLineaire = True
     
     if parkingLineaire:
-        if key == 'simFinale':
+        if typeSimulation == 'simFinale':
             return scoreSimulationFinale(parking)
-        elif key == 'simAlea':
+        elif typeSimulation == 'simAlea':
             return scoreSimulationAleatoire(parking)
         else:
             return scoreNombrePlaces(parking)
@@ -99,17 +99,27 @@ def score(parking,key = ''):
 
 ### Fonctions de croisement
 
+def croisementAleatoire(P1,scoreP1,P2,scoreP2):
+    """
+    Fonction de croisement aléatoire. On crée un parking p3 et p4
+    héritant respectivement de moitiés de P1 et P2 choisies aléatoirement
+    """
+    p3, p4 = deepcopy(P1), deepcopy(P2)
+    iAleaChoisis = np.random.choice(LARGEUR_PARKING,size = LONGUEUR_PARKING*LARGEUR_PARKING//2, replace = False)
+    jAleaChoisis = np.random.choice(LONGUEUR_PARKING,size = LONGUEUR_PARKING*LARGEUR_PARKING//2, replace = False)
+    for i in range(LONGUEUR_PARKING*LARGEUR_PARKING//2):
+        p3[iAleaChoisis,iAleaChoisis] = P2[iAleaChoisis,jAleaChoisis]
+        p4[iAleaChoisis,iAleaChoisis] = P1[iAleaChoisis,jAleaChoisis]
+    
+    return [(P1,scoreP1),(P2,scoreP2),(p3,score(p3)),(p4,score(p4))]
+
 def croisement2Coupage(P1,scoreP1,P2,scoreP2):
     """
-    Fonction de croisement à 2 points de coupure. On crée un parking p3 et p4
+    Fonction de croisement à un point de coupure. On crée un parking p3 et p4
     héritant respectivement d'une zone supérieure de P1 et P2
     """
     iCoupage,jCoupage = randint(0,LARGEUR_PARKING-1),randint(0,LONGUEUR_PARKING-1)
     p3, p4 = deepcopy(P1), deepcopy(P2)
-    if random()<PROBA_TRANSPOSE:
-        p3 = p3.transpose()
-    if random()<PROBA_TRANSPOSE:
-        p4 = p4.transpose()
     p3[:iCoupage,:jCoupage] = P1[:iCoupage,:jCoupage]
     p4[:iCoupage,:jCoupage] = P2[:iCoupage,:jCoupage]
     
@@ -118,7 +128,7 @@ def croisement2Coupage(P1,scoreP1,P2,scoreP2):
 def croisementRoutes(P1,scoreP1,P2,scoreP2):
     """
     Fonction de croisement où l'on crée un parking p3 et p4 héritant respectivement
-    de la route de P1 et de P2
+    de la route principale de P1 et de P2
     """
     coordonneesRouteP1, coordonneesRouteP2 = coordonneesRoutes(P1), coordonneesRoutes(P2)
     p3, p4 = deepcopy(P1), deepcopy(P2)
@@ -144,7 +154,7 @@ def mutationRandom(parking,probaMut):
             if (i,j) not in COORDS_ENTREES and (i,j) not in COORDS_SORTIES:
                 if random()<probaMut:
                     parking[i,j] = [NUM_MUR,NUM_ROUTE,NUM_PLACE][randint(0,2)]
-                    
+
 def mutationDeviation(parking):
     """
     Fonction de mutation d'un parking en modifiant une des trajectoires d'une
