@@ -56,43 +56,37 @@ def croisementParkings(popParkingsxScores):
     for i in range(0,N_PARKINGS//2,2):
         (pere,scorePere), (mere,scoreMere) = popParkingsxScores[i], popParkingsxScores[i+1]
         if scorePere<SCORE_SEUIL or scoreMere<SCORE_SEUIL:
-            parkingsAjout = croisementAleatoire(pere,scorePere,mere,scoreMere)
+            parkingsAjout = croisement2Coupage(pere,scorePere,mere,scoreMere)
         else:
-            parkingsAjout = croisementAleatoire(pere,scorePere,mere,scoreMere)
+            parkingsAjout = croisement2Coupage(pere,scorePere,mere,scoreMere)
         grosseListeParkings += parkingsAjout
     
     return grosseListeParkings
 
-def mutationParkings(popParkingsxScore,stagnationPop):
+def mutationParkings(popParkingsxScore):
     for numParking in range(2,N_PARKINGS):
         (parking,score) = popParkingsxScore[numParking]
         if score < SCORE_SEUIL:
             mutationRandom(parking,PROBA_RANDOM_MUT)
-        elif stagnationPop:
-            mutationRandom(parking,PROBA_RANDOM_MUT/20)
         else:
             mutationAjoutBoutRoute(parking)
         popParkingsxScore[numParking] = (parking,score)
     return popParkingsxScore
-
-def stagne(evolScores):
-    return len(evolScores) < SEUIL_STAGNATION or evolScores[-SEUIL_STAGNATION] == evolScores[-1]
 
 def evolutionGenetique():
     
     popParkingsxScores = [(creationRandomParking(LONGUEUR_PARKING,LARGEUR_PARKING),SCORE_MAUVAIS) for _ in range(N_PARKINGS)]
     evolScores = []
     evolParkings = np.zeros((N_GENERATIONS,LARGEUR_PARKING,LONGUEUR_PARKING))
-    NIterationsAvantLien = np.zeros(250)
-    for _ in range(250):
+    NIterationsAvantLien = np.zeros(100)
+    for _ in range(100):
         i = 0
         meilleurscore = -999
-        while meilleurscore < 0 and i<1000:
+        while meilleurscore <= 0 and i<1000:
             popParkingsxScores = selectionPopParkings(popParkingsxScores)
             meilleurscore = popParkingsxScores[0][1]
             popParkingsxScores = croisementParkings(popParkingsxScores)
-            stagnationPop = stagne(evolScores)
-            popParkingsxScores = mutationParkings(popParkingsxScores,stagnationPop)
+            popParkingsxScores = mutationParkings(popParkingsxScores)
             i += 1
             #print(meilleurscore)
         popParkingsxScores = [(creationRandomParking(LONGUEUR_PARKING,LARGEUR_PARKING),SCORE_MAUVAIS) for _ in range(N_PARKINGS)]
