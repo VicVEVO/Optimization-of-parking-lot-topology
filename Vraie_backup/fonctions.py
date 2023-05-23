@@ -43,7 +43,8 @@ def selectionPopParkings(popParkingsxScore):
         resultats.append([parking,scoreParking])
 
     resultats = np.array(resultats,dtype=object)
-    resultats = resultats[resultats[:,1].argsort()]
+    resultats = resultats[resultats[:,1].argsort()[::-1]] # on trie dans l'ordre décroissant
+
 
     meilleurParking1 = deepcopy(resultats[0])
     meilleurParking2 = deepcopy(resultats[1])
@@ -54,10 +55,10 @@ def croisementParkings(popParkingsxScores):
 
     for i in range(0,N_PARKINGS//2,2):
         (pere,scorePere), (mere,scoreMere) = popParkingsxScores[i], popParkingsxScores[i+1]
-        if scorePere>SCORE_SEUIL or scoreMere>SCORE_SEUIL:
-            parkingsAjout = croisement2Coupage(pere,scorePere,mere,scoreMere)
+        if scorePere<SCORE_SEUIL or scoreMere<SCORE_SEUIL:
+            parkingsAjout = croisementAleatoire(pere,scorePere,mere,scoreMere)
         else:
-            parkingsAjout = croisement2Coupage(pere,scorePere,mere,scoreMere)
+            parkingsAjout = croisementAleatoire(pere,scorePere,mere,scoreMere)
         grosseListeParkings += parkingsAjout
     
     return grosseListeParkings
@@ -65,7 +66,7 @@ def croisementParkings(popParkingsxScores):
 def mutationParkings(popParkingsxScore,stagnationPop):
     for numParking in range(2,N_PARKINGS):
         (parking,score) = popParkingsxScore[numParking]
-        if score > SCORE_SEUIL:
+        if score < SCORE_SEUIL:
             mutationRandom(parking,PROBA_RANDOM_MUT)
         elif stagnationPop:
             mutationRandom(parking,PROBA_RANDOM_MUT/20)
@@ -78,23 +79,27 @@ def stagne(evolScores):
     return len(evolScores) < SEUIL_STAGNATION or evolScores[-SEUIL_STAGNATION] == evolScores[-1]
 
 def evolutionGenetique():
-
+    
     popParkingsxScores = [(creationRandomParking(LONGUEUR_PARKING,LARGEUR_PARKING),SCORE_MAUVAIS) for _ in range(N_PARKINGS)]
     evolScores = []
     evolParkings = np.zeros((N_GENERATIONS,LARGEUR_PARKING,LONGUEUR_PARKING))
-    for _ in range(N_GENERATIONS):
-        t1 = time()
-        popParkingsxScores = selectionPopParkings(popParkingsxScores)
-        meilleurActuel = popParkingsxScores[0]
-        popParkingsxScores = croisementParkings(popParkingsxScores)
-        stagnationPop = stagne(evolScores)
-        popParkingsxScores = mutationParkings(popParkingsxScores,stagnationPop)
-        
-        evolParkings[_] = meilleurActuel[0]
-        evolScores.append(meilleurActuel[1]) 
+    NIterationsAvantLien = np.zeros(250)
+    for _ in range(250):
+        i = 0
+        meilleurscore = -999
+        while meilleurscore < 0 and i<1000:
+            popParkingsxScores = selectionPopParkings(popParkingsxScores)
+            meilleurscore = popParkingsxScores[0][1]
+            popParkingsxScores = croisementParkings(popParkingsxScores)
+            stagnationPop = stagne(evolScores)
+            popParkingsxScores = mutationParkings(popParkingsxScores,stagnationPop)
+            i += 1
+            #print(meilleurscore)
+        popParkingsxScores = [(creationRandomParking(LONGUEUR_PARKING,LARGEUR_PARKING),SCORE_MAUVAIS) for _ in range(N_PARKINGS)]
+        NIterationsAvantLien[_] = i
+        print(i)
 
-        t2 = time()
-        print(meilleurActuel[1],'//',np.round(t2-t1,1),'//',_)
+    print(NIterationsAvantLien)
 
     affichageEvolScore(np.array(evolScores))
     diagrammeDispersionScores(np.array(popParkingsxScores)[:,1])
