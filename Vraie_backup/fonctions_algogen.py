@@ -17,13 +17,13 @@ def scoreNombrePlaces(parking):
     placesAcc = placesBordsRoute(parking)
     for (i,j) in placesAcc:
         nbPlacesAccessibles += len(placesAcc[i,j])
-    return SCORE_SEUIL - nbPlacesAccessibles
+    return SCORE_SEUIL + nbPlacesAccessibles
 
 def scoreTailleRoute(parking,coordsRoute):
     tailleRoute = 0
     for (i,j) in coordsRoute:
         tailleRoute += len(coordsRoute[i,j])
-    return SCORE_SEUIL + 1/(tailleRoute)
+    return SCORE_SEUIL - 1/tailleRoute
 
 def periodeArriveeVoitures(score):
     return a_T*abs(score) + b_T
@@ -46,7 +46,7 @@ def scoreSimulationFinale(parking):
                 
         evolParkings[k] = parkingSim
     affichageLoop(evolParkings)
-    return COEFF_MISE_A_NIVEAU_SCORES_SIMFINALE/(tMoyGarage+tMoySortie)
+    return SCORE_SEUIL + COEFF_MISE_A_NIVEAU_SCORES_SIMFINALE/(tMoyGarage+tMoySortie)
 
 def scoreSimulationAleatoire(parking):
     evolParkings = np.zeros((N_ITERATIONS,LARGEUR_PARKING,LONGUEUR_PARKING))
@@ -67,7 +67,7 @@ def scoreSimulationAleatoire(parking):
         evolParkings[k] = parkingSim
 
     affichageLoop(evolParkings)
-    return COEFF_MISE_A_NIVEAU_SCORES_SIMALEA/(tMoyGarage+tMoySortie)
+    return SCORE_SEUIL + COEFF_MISE_A_NIVEAU_SCORES_SIMALEA/(tMoyGarage+tMoySortie)
 
 def score(parking,typeSimulation = ''):
     """
@@ -105,8 +105,8 @@ def croisementAleatoire(P1,scoreP1,P2,scoreP2):
     héritant respectivement de moitiés de P1 et P2 choisies aléatoirement
     """
     p3, p4 = deepcopy(P1), deepcopy(P2)
-    iAleaChoisis = np.random.choice(LARGEUR_PARKING,size = LONGUEUR_PARKING*LARGEUR_PARKING//2, replace = False)
-    jAleaChoisis = np.random.choice(LONGUEUR_PARKING,size = LONGUEUR_PARKING*LARGEUR_PARKING//2, replace = False)
+    iAleaChoisis = np.random.choice(LARGEUR_PARKING,size = LONGUEUR_PARKING*LARGEUR_PARKING//2)
+    jAleaChoisis = np.random.choice(LONGUEUR_PARKING,size = LONGUEUR_PARKING*LARGEUR_PARKING//2)
     for i in range(LONGUEUR_PARKING*LARGEUR_PARKING//2):
         p3[iAleaChoisis,iAleaChoisis] = P2[iAleaChoisis,jAleaChoisis]
         p4[iAleaChoisis,iAleaChoisis] = P1[iAleaChoisis,jAleaChoisis]
@@ -135,10 +135,10 @@ def croisementRoutes(P1,scoreP1,P2,scoreP2):
     
     for (i,j) in coordonneesRouteP1:
         for (x,y) in coordonneesRouteP1[i,j]:
-            p3[x,y] = NUM_ROUTE
+            p4[x,y] = NUM_ROUTE
     for (i,j) in coordonneesRouteP2:
         for (x,y) in coordonneesRouteP2[i,j]:
-            p4[x,y] = NUM_ROUTE
+            p3[x,y] = NUM_ROUTE
         
     return [(P1,scoreP1),(P2,scoreP2),(p3,score(p3)),(p4,score(p4))]
 
