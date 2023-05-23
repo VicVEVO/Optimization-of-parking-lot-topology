@@ -12,9 +12,9 @@ PROBA_RANDOM_MUT = 0.6 # 0.3
 PROBA_TRANSPOSE = 0.05 # à enlever
 COEFF_DEVIATION_MUT = 1
 
-SCORE_MAUVAIS = float('inf')
-SCORE_SEUIL = 1
-SCORE_SUP = -100
+SCORE_MAUVAIS = -float('inf')
+SCORE_SEUIL = 0
+SCORE_SUP = 100
 
 T_MAX_VOIT = 10 # 1 voiture/10sec
 T_MIN_VOIT = 1 # 1 voiture/sec
